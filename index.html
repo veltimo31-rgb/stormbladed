@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade</title>
+<title>Stormblade - Peer-to-Peer Multiplayer</title>
+<!-- PeerJS Library for Direct Browser-to-Browser Connections -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { 
@@ -14,6 +16,23 @@
   #game-container { position: relative; width: 100vw; height: 100vh; }
   canvas { width: 100vw; height: 100vh; background-color: #3b5e2b; display: block; }
   
+  /* Room Code UI Banner */
+  #multiplayer-bar {
+    position: absolute; top: 10px; right: 10px; z-index: 10;
+    background: rgba(0,0,0,0.85); border: 2px solid #daa520;
+    padding: 10px 14px; border-radius: 8px; color: white;
+    display: flex; gap: 8px; align-items: center; font-size: 13px;
+  }
+  .mp-btn {
+    background: #333; color: #daa520; border: 1px solid #daa520;
+    padding: 6px 12px; cursor: pointer; border-radius: 4px; font-weight: bold;
+  }
+  .mp-btn:hover { background: #daa520; color: #111; }
+  #room-input {
+    width: 100px; padding: 5px; background: #222; color: white;
+    border: 1px solid #666; border-radius: 4px; text-align: center; font-weight: bold;
+  }
+
   .modal-shop { 
     display: none; position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%); background: #222; 
@@ -31,7 +50,7 @@
   .craft-btn { color: #2ecc71; border-color: #2ecc71; }
   .craft-btn:hover { background: #2ecc71; color: #111; }
 
-  /* Chat UI Panel */
+  /* Chat Box */
   #chat-container {
     position: absolute; bottom: 20px; left: 20px; width: 340px;
     z-index: 5; display: flex; flex-direction: column; gap: 6px;
@@ -53,6 +72,14 @@
 
 <div id="game-container">
   <canvas id="gameCanvas"></canvas>
+
+  <div id="multiplayer-bar">
+    <button class="mp-btn" id="btn-host">Host Room</button>
+    <span style="color:#aaa;">OR</span>
+    <input type="text" id="room-input" placeholder="CODE" maxlength="5">
+    <button class="mp-btn" id="btn-join">Join</button>
+    <span id="room-status" style="margin-left:5px; color:#f1c40f; font-weight:bold;"></span>
+  </div>
 
   <div id="chat-container">
     <div id="chat-messages"></div>
@@ -86,7 +113,7 @@ window.addEventListener('load', function() {
     const craftDiv = document.getElementById('crafting');
 
     let WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
-    window.addEventListener('resize', function() {
+    window.addEventListener('resize', () => {
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
         WIDTH = canvas.width; HEIGHT = canvas.height;
     });
@@ -132,28 +159,106 @@ window.addEventListener('load', function() {
     let trees = [], ponds = [], particles = [], popups = [], chunksGenerated = {}, respawnQueue = [];
     const merchant = { x: 120, y: -80 }, craftingTable = { x: 240, y: -80 };
 
-    const myId = "Player_" + Math.floor(1000 + Math.random() * 9000);
+    // --- PEERJS ROOM CODE SYSTEM ---
+    let peer = null;
+    let peerConnections = [];
+    let otherPlayers = {};
+    const myId = "P_" + Math.floor(1000 + Math.random() * 9000);
+    const roomStatus = document.getElementById('room-status');
 
     function addChatMessage(sender, text) {
         let box = document.getElementById('chat-messages');
-        if (!box) return;
         let el = document.createElement('div');
         el.className = 'chat-msg';
-        let color = sender === myId ? '#f1c40f' : '#2ecc71';
+        let color = sender === myId ? '#f1c40f' : (sender === 'System' ? '#2ecc71' : '#3498db');
         el.innerHTML = `<strong style="color:${color}">${sender}:</strong> ${text}`;
         box.appendChild(el);
         box.scrollTop = box.scrollHeight;
     }
 
-    addChatMessage("System", "Press Enter to chat!");
+    addChatMessage("System", "Host a room or enter a code to play together!");
+
+    function setupDataConnection(conn) {
+        peerConnections.push(conn);
+
+        conn.on('data', (data) => {
+            if (data.type === 'move') {
+                otherPlayers[data.id] = { x: data.x, y: data.y, facing: data.facing, lastSeen: Date.now() };
+            } else if (data.type === 'chat') {
+                addChatMessage(data.id, data.text);
+                if (otherPlayers[data.id]) {
+                    spawnPopUp(data.text, "#ffffff", otherPlayers[data.id].x, otherPlayers[data.id].y - 35);
+                }
+            }
+        });
+
+        conn.on('close', () => {
+            peerConnections = peerConnections.filter(c => c !== conn);
+        });
+    }
+
+    // Host Room Button
+    document.getElementById('btn-host').onclick = function() {
+        let code = Math.floor(1000 + Math.random() * 9000).toString();
+        peer = new Peer("sb-room-" + code);
+        
+        peer.on('open', (id) => {
+            roomStatus.innerText = "ROOM CODE: " + code;
+            addChatMessage("System", "Room active! Give your friend code: " + code);
+            spawnPopUp("Room Code: " + code, "#f1c40f", player.x, player.y - 45);
+        });
+
+        peer.on('connection', (conn) => {
+            setupDataConnection(conn);
+            addChatMessage("System", "Friend connected!");
+        });
+
+        peer.on('error', (err) => {
+            roomStatus.innerText = "Error hosting. Try again.";
+        });
+    };
+
+    // Join Room Button
+    document.getElementById('btn-join').onclick = function() {
+        let code = document.getElementById('room-input').value.trim();
+        if (code.length < 4) return;
+        
+        peer = new Peer();
+        peer.on('open', () => {
+            let conn = peer.connect("sb-room-" + code);
+            conn.on('open', () => {
+                setupDataConnection(conn);
+                roomStatus.innerText = "CONNECTED!";
+                addChatMessage("System", "Joined Room " + code);
+                spawnPopUp("Connected to Host!", "#2ecc71", player.x, player.y - 45);
+            });
+            conn.on('error', () => {
+                roomStatus.innerText = "Room not found!";
+            });
+        });
+    };
+
+    let lastSendTime = 0;
+    function broadcastPosition() {
+        let now = Date.now();
+        if (now - lastSendTime > 50 && peerConnections.length > 0) {
+            let packet = { type: 'move', id: myId, x: Math.round(player.x), y: Math.round(player.y), facing: player.facing };
+            peerConnections.forEach(c => { if(c.open) c.send(packet); });
+            lastSendTime = now;
+        }
+    }
 
     const chatInput = document.getElementById('chat-input');
-    chatInput.addEventListener('keydown', function(e) { e.stopPropagation(); });
-    chatInput.addEventListener('keyup', function(e) {
+    chatInput.addEventListener('keydown', e => e.stopPropagation());
+    chatInput.addEventListener('keyup', e => {
         e.stopPropagation();
         if (e.key === 'Enter') {
             let txt = chatInput.value.trim();
             if (txt !== '') {
+                if (peerConnections.length > 0) {
+                    let packet = { type: 'chat', id: myId, text: txt };
+                    peerConnections.forEach(c => { if(c.open) c.send(packet); });
+                }
                 addChatMessage(myId, txt);
                 spawnPopUp(txt, "#ffffff", player.x, player.y - 35);
             }
@@ -215,7 +320,7 @@ window.addEventListener('load', function() {
         }
     }
 
-    function spawnPopUp(text, color, x, y) { popups.push({ text: text, color: color, x: x, y: y, life: 45, vy: -1.2 }); }
+    function spawnPopUp(text, color, x, y) { popups.push({ text, color, x, y, life: 45, vy: -1.2 }); }
 
     function getFishDrop() {
         let roll = Math.random();
@@ -227,7 +332,7 @@ window.addEventListener('load', function() {
     }
 
     window.addEventListener('keydown', function(e) {
-        if (document.activeElement === chatInput) return;
+        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input')) return;
         if (e.key === 'Enter') { chatInput.focus(); return; }
 
         keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
@@ -273,7 +378,7 @@ window.addEventListener('load', function() {
             player.platinum -= player.axe_level * 50; player.axe_level++; player.axe_damage++; updateUIs(); saveGame();
         }
     };
-    const exitShop = function() { inMenu = false; menuType = null; shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; };
+    const exitShop = () => { inMenu = false; menuType = null; shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; };
     document.getElementById('btn-exit').onclick = exitShop; document.getElementById('craft-exit').onclick = exitShop;
 
     document.getElementById('craft-rod').onclick = function() {
@@ -297,13 +402,15 @@ window.addEventListener('load', function() {
 
     function update(dt) {
         if (!inMenu) {
-            let dx = 0, dy = 0;
-            if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
-            if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
-            if (keys['a']||keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
-            if (keys['d']||keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
+            let dx = 0, dy = 0, moved = false;
+            if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
+            if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; moved=true; }
+            if (keys['a']||keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; moved=true; }
+            if (keys['d']||keys['arrowright']) { dx += player.speed; player.facing = 'right'; moved=true; }
             if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
             player.x += dx; player.y += dy;
+
+            if (moved) broadcastPosition();
 
             let cx = Math.floor(player.x/CHUNK_SIZE), cy = Math.floor(player.y/CHUNK_SIZE);
             for(let x=cx-1; x<=cx+1; x++) for(let y=cy-1; y<=cy+1; y++) generateChunk(x,y);
@@ -381,9 +488,9 @@ window.addEventListener('load', function() {
         }
     }
 
-    function drawModel(x, y, facing, color) {
+    function drawModel(x, y, facing, color='#b02323') {
         ctx.fillStyle = '#1b365d'; ctx.fillRect(x+10, y+30, 8, 10); ctx.fillRect(x+22, y+30, 8, 10);
-        ctx.fillStyle = color || '#b02323'; ctx.fillRect(x+8, y+16, 24, 14);
+        ctx.fillStyle = color; ctx.fillRect(x+8, y+16, 24, 14);
         ctx.fillStyle = '#6b1111'; ctx.fillRect(x+12, y+16, 4, 14); ctx.fillRect(x+20, y+16, 4, 14);
         ctx.fillStyle = '#f5c6a5'; ctx.fillRect(x+12, y+2, 16, 14);
         
@@ -406,7 +513,7 @@ window.addEventListener('load', function() {
         ctx.save(); ctx.translate(camX, camY);
 
         // Ponds
-        ponds.forEach(function(p) {
+        ponds.forEach(p => {
             if (Math.abs(p.x - player.x) > WIDTH || Math.abs(p.y - player.y) > HEIGHT) return;
             ctx.fillStyle = '#2c4c1e'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r+6, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#2980b9'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
@@ -425,7 +532,7 @@ window.addEventListener('load', function() {
         let time = Date.now();
         
         // Trees
-        trees.forEach(function(t) {
+        trees.forEach(t => {
             if (Math.abs(t.x - player.x) > WIDTH || Math.abs(t.y - player.y) > HEIGHT) return;
             let sway = Math.sin(time/350 + t.x) * 4;
             let tData = TREE_TYPES[t.type] || TREE_TYPES.oak;
@@ -443,7 +550,16 @@ window.addEventListener('load', function() {
             }
         });
 
-        // Player Model
+        // Other Players (PeerJS Connected)
+        for (let pid in otherPlayers) {
+            let op = otherPlayers[pid];
+            if (time - op.lastSeen > 8000) { delete otherPlayers[pid]; continue; }
+            drawModel(op.x, op.y, op.facing, '#2980b9');
+            ctx.fillStyle = '#3498db'; ctx.font = 'bold 11px Arial'; ctx.textAlign='center';
+            ctx.fillText(pid, op.x+20, op.y-6);
+        }
+
+        // Self
         drawModel(player.x, player.y, player.facing, '#b02323');
         ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 11px Arial'; ctx.textAlign='center'; 
         ctx.fillText(myId + " (You)", player.x+20, player.y-6);
@@ -467,8 +583,8 @@ window.addEventListener('load', function() {
             ctx.fillRect(player.x-8, player.y-16, 56 * Math.min(1, prog/req), 6);
         }
 
-        particles.forEach(function(p) { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4); });
-        popups.forEach(function(p) { ctx.fillStyle = p.color; ctx.font = 'bold 14px Arial'; ctx.textAlign='center'; ctx.fillText(p.text, p.x+20, p.y); });
+        particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4); });
+        popups.forEach(p => { ctx.fillStyle = p.color; ctx.font = 'bold 14px Arial'; ctx.textAlign='center'; ctx.fillText(p.text, p.x+20, p.y); });
         
         ctx.restore();
 
