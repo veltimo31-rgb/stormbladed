@@ -52,7 +52,6 @@ let respawnQueue = [];
 for (let i = 0; i < 40; i++) {
     let tx = Math.floor(Math.random() * ((WIDTH - TILE_SIZE) / TILE_SIZE)) * TILE_SIZE;
     let ty = Math.floor(Math.random() * ((HEIGHT - TILE_SIZE) / TILE_SIZE)) * TILE_SIZE;
-    // Don't spawn on merchant
     if (Math.abs(tx - merchant.x) < TILE_SIZE && Math.abs(ty - merchant.y) < TILE_SIZE) continue;
     trees.push({x: tx, y: ty, health: 3});
 }
@@ -60,16 +59,15 @@ for (let i = 0; i < 40; i++) {
 // --- Controls ---
 window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
-    keys[e.code] = true; // For Space and Arrows
+    keys[e.code] = true; 
     
     if (inShop) {
         if (e.key === '1') document.getElementById('btn-sell').click();
         if (e.key === '2') document.getElementById('btn-upgrade').click();
         if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('btn-exit').click();
-        return; // Stop other inputs while in shop
+        return; 
     }
 
-    // Calculate Reach Area
     let reachArea = {x: player.x, y: player.y, w: TILE_SIZE, h: TILE_SIZE};
     let reach = 20;
     if (player.facing === 'up') { reachArea.y -= reach; reachArea.h = reach; }
@@ -77,12 +75,169 @@ window.addEventListener('keydown', e => {
     else if (player.facing === 'left') { reachArea.x -= reach; reachArea.w = reach; }
     else if (player.facing === 'right') { reachArea.x += TILE_SIZE; reachArea.w = reach; }
 
-    // Chop Trees
     if (e.code === 'Space') {
         for (let i = trees.length - 1; i >= 0; i--) {
             let t = trees[i];
-            // Check collision
             if (reachArea.x < t.x + TILE_SIZE && reachArea.x + reachArea.w > t.x &&
                 reachArea.y < t.y + TILE_SIZE && reachArea.y + reachArea.h > t.y) {
                 t.health -= player.axe_damage;
-                if (t.health
+                if (t.health <= 0) {
+                    respawnQueue.push({x: t.x, y: t.y, time: Date.now()});
+                    trees.splice(i, 1);
+                    player.wood += Math.floor(Math.random() * 4) + 2;
+                }
+            }
+        }
+    }
+    
+    if (e.key.toLowerCase() === 'e') {
+        if (reachArea.x < merchant.x + TILE_SIZE && reachArea.x + reachArea.w > merchant.x &&
+            reachArea.y < merchant.y + TILE_SIZE && reachArea.y + reachArea.h > merchant.y) {
+            inShop = true;
+            shopDiv.style.display = 'block';
+            updateShopUI();
+        }
+    }
+});
+
+window.addEventListener('keyup', e => { 
+    keys[e.key.toLowerCase()] = false; 
+    keys[e.code] = false; 
+});
+
+// --- Shop Logic ---
+function updateShopUI() {
+    document.getElementById('btn-upgrade').innerText = `Upgrade Axe (${player.axe_level * 50} Platinum) [2]`;
+}
+
+document.getElementById('btn-sell').onclick = () => {
+    if (player.wood > 0) {
+        player.platinum += player.wood * 5;
+        player.wood = 0;
+    }
+};
+
+document.getElementById('btn-upgrade').onclick = () => {
+    let cost = player.axe_level * 50;
+    if (player.platinum >= cost) {
+        player.platinum -= cost;
+        player.axe_level++;
+        player.axe_damage++;
+        updateShopUI();
+    }
+};
+
+document.getElementById('btn-exit').onclick = () => {
+    inShop = false;
+    shopDiv.style.display = 'none';
+};
+
+// --- Game Loop ---
+function update() {
+    if (!inShop) {
+        let dx = 0, dy = 0;
+        if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
+        if (keys['s'] || keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
+        if (keys['a'] || keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
+        if (keys['d'] || keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
+
+        player.x = Math.max(0, Math.min(WIDTH - TILE_SIZE, player.x + dx));
+        player.y = Math.max(0, Math.min(HEIGHT - TILE_SIZE, player.y + dy));
+    }
+
+    let now = Date.now();
+    for (let i = respawnQueue.length - 1; i >= 0; i--) {
+        if (now - respawnQueue[i].time >= RESPAWN_TIME) {
+            trees.push({x: respawnQueue[i].x, y: respawnQueue[i].y, health: 3});
+            respawnQueue.splice(i, 1);
+        }
+    }
+}
+
+function draw() {
+    ctx.fillStyle = 'rgb(86, 125, 70)';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    trees.forEach(t => {
+        ctx.fillStyle = 'rgb(101, 67, 33)'; 
+        ctx.fillRect(t.x + 10, t.y + 20, 20, 20);
+        ctx.fillStyle = 'rgb(45, 87, 44)'; 
+        ctx.fillRect(t.x, t.y, TILE_SIZE, TILE_SIZE - 10);
+    });
+
+    ctx.fillStyle = 'rgb(70, 130, 200)';
+    ctx.fillRect(merchant.x, merchant.y, TILE_SIZE, TILE_SIZE);
+    ctx.fillStyle = 'rgb(229, 228, 226)'; 
+    ctx.beginPath();
+    ctx.arc(merchant.x + 20, merchant.y + 20, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    let px = player.x;
+    let py = player.y;
+
+    ctx.fillStyle = '#1e3f5a';
+    ctx.fillRect(px + 10, py + 30, 8, 10);
+    ctx.fillRect(px + 22, py + 30, 8, 10);
+
+    ctx.fillStyle = '#c83232';
+    ctx.fillRect(px + 8, py + 16, 24, 14);
+    ctx.fillStyle = '#8a1c1c';
+    ctx.fillRect(px + 12, py + 16, 4, 14);
+    ctx.fillRect(px + 20, py + 16, 4, 14);
+    ctx.fillRect(px + 8, py + 20, 24, 4);
+
+    ctx.fillStyle = '#f5c6a5';
+    ctx.fillRect(px + 12, py + 2, 16, 14);
+
+    ctx.fillStyle = '#4a2f1d';
+    if (player.facing === 'up') {
+        ctx.fillRect(px + 12, py + 2, 16, 14); 
+    } else {
+        ctx.fillRect(px + 12, py + 2, 16, 4); 
+        if (player.facing === 'down') {
+            ctx.fillRect(px + 12, py + 12, 16, 4); 
+            ctx.fillStyle = 'black';
+            ctx.fillRect(px + 15, py + 7, 3, 3);
+            ctx.fillRect(px + 22, py + 7, 3, 3);
+        } else if (player.facing === 'left') {
+            ctx.fillRect(px + 12, py + 8, 6, 8); 
+            ctx.fillStyle = 'black';
+            ctx.fillRect(px + 14, py + 7, 3, 3); 
+        } else if (player.facing === 'right') {
+            ctx.fillRect(px + 22, py + 8, 6, 8); 
+            ctx.fillStyle = 'black';
+            ctx.fillRect(px + 23, py + 7, 3, 3); 
+        }
+    }
+
+    if (player.facing === 'right' || player.facing === 'down') {
+        ctx.fillStyle = '#5c4033'; 
+        ctx.fillRect(px + 28, py + 18, 4, 16);
+        ctx.fillStyle = '#bdc3c7'; 
+        ctx.fillRect(px + 30, py + 16, 8, 8);
+    } else if (player.facing === 'left' || player.facing === 'up') {
+        ctx.fillStyle = '#5c4033'; 
+        ctx.fillRect(px + 8, py + 18, 4, 16);
+        ctx.fillStyle = '#bdc3c7'; 
+        ctx.fillRect(px + 2, py + 16, 8, 8);
+    }
+
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText(`Wood: ${player.wood}`, 10, 30);
+    ctx.fillStyle = 'rgb(229, 228, 226)';
+    ctx.fillText(`Platinum: ${player.platinum}`, 10, 60);
+    ctx.fillStyle = 'white';
+    ctx.fillText(`Axe Lvl: ${player.axe_level} (Dmg: ${player.axe_damage})`, 10, 90);
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
