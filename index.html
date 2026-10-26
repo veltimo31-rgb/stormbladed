@@ -3,11 +3,11 @@
 <head>
 <title>Stormblade</title>
 <style>
-  body { background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; }
-  canvas { background: rgb(86, 125, 70); box-shadow: 0 0 15px #000; }
-  #shop { display: none; position: absolute; background: #282828; border: 3px solid #E5E4E2; padding: 20px; width: 400px; text-align: center; color: white; }
-  .shop-btn { display: block; margin: 10px auto; padding: 10px; background: #444; color: white; border: 1px solid #E5E4E2; cursor: pointer; width: 80%; font-size: 16px; }
-  .shop-btn:hover { background: #555; }
+  body { background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; overflow: hidden; }
+  canvas { box-shadow: 0 0 15px #000; }
+  #shop { display: none; position: absolute; background: #282828; border: 3px solid #E5E4E2; padding: 20px; width: 400px; text-align: center; color: white; border-radius: 8px; font-family: 'Courier New', Courier, monospace; }
+  .shop-btn { display: block; margin: 10px auto; padding: 10px; background: #444; color: white; border: 1px solid #E5E4E2; cursor: pointer; width: 80%; font-size: 16px; transition: 0.2s; }
+  .shop-btn:hover { background: #5a7d5a; border-color: white; }
 </style>
 </head>
 <body>
@@ -15,8 +15,9 @@
 <div id="game-container">
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   <div id="shop">
-    <h2 style="color: #E5E4E2;">Merchant Shop</h2>
-    <button class="shop-btn" id="btn-sell">Sell all Wood (5 Platinum each) [1]</button>
+    <h2 style="color: #E5E4E2;">Wandering Merchant</h2>
+    <p><i>"Need a sharper blade, traveler?"</i></p>
+    <button class="shop-btn" id="btn-sell">Sell all Wood (5 Plat each) [1]</button>
     <button class="shop-btn" id="btn-upgrade">Upgrade Axe [2]</button>
     <button class="shop-btn" id="btn-exit">Exit Shop [E]</button>
   </div>
@@ -30,30 +31,66 @@ const shopDiv = document.getElementById('shop');
 
 const TILE_SIZE = 40;
 const WIDTH = 800, HEIGHT = 600;
-const RESPAWN_TIME = 20000; // 20 seconds
+const CHUNK_SIZE = 600;
+const RESPAWN_TIME = 20000;
 
 let inShop = false;
 let keys = {};
 
+// --- Generate Grass Texture ---
+const grassCanvas = document.createElement('canvas');
+grassCanvas.width = 100; grassCanvas.height = 100;
+const gCtx = grassCanvas.getContext('2d');
+gCtx.fillStyle = '#4f7541'; // Base dark green
+gCtx.fillRect(0, 0, 100, 100);
+for (let i = 0; i < 400; i++) {
+    gCtx.fillStyle = Math.random() > 0.5 ? '#5b874b' : '#436337'; // Lighter/Darker blades
+    gCtx.fillRect(Math.random() * 100, Math.random() * 100, 2, 6 + Math.random() * 4);
+}
+const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
+
 // --- Entities ---
 const player = {
-    x: WIDTH / 2, y: HEIGHT / 2,
+    x: 0, y: 0, // Starts at 0,0
     speed: 4, wood: 0, platinum: 0,
     axe_level: 1, axe_damage: 1,
     facing: 'down'
 };
 
-const merchant = { x: WIDTH - 100, y: 100 };
+const merchant = { x: 100, y: -100 }; // Merchant stands a bit north
 
 let trees = [];
+let chunksGenerated = new Set();
 let respawnQueue = [];
 
-// Generate Initial Forest
-for (let i = 0; i < 40; i++) {
-    let tx = Math.floor(Math.random() * ((WIDTH - TILE_SIZE) / TILE_SIZE)) * TILE_SIZE;
-    let ty = Math.floor(Math.random() * ((HEIGHT - TILE_SIZE) / TILE_SIZE)) * TILE_SIZE;
-    if (Math.abs(tx - merchant.x) < TILE_SIZE && Math.abs(ty - merchant.y) < TILE_SIZE) continue;
-    trees.push({x: tx, y: ty, health: 3});
+// --- Infinite World Generation ---
+function generateChunk(cx, cy) {
+    let key = cx + ',' + cy;
+    if (chunksGenerated.has(key)) return;
+    chunksGenerated.add(key);
+
+    let treeCount = Math.floor(Math.random() * 8) + 6; // 6 to 13 trees per chunk
+    for (let i = 0; i < treeCount; i++) {
+        let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
+        let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
+        
+        // Keep clear of merchant spawn
+        if (Math.hypot(tx - merchant.x, ty - merchant.y) < 150) continue; 
+        
+        trees.push({ x: tx, y: ty, health: 3, id: Math.random() });
+    }
+}
+
+function updateWorldChunks() {
+    let cx = Math.floor(player.x / CHUNK_SIZE);
+    let cy = Math.floor(player.y / CHUNK_SIZE);
+    
+    // Generate current chunk and all 8 surrounding chunks
+    for (let x = cx - 1; x <= cx + 1; x++) {
+        for (let y = cy - 1; y <= cy + 1; y++) {
+            generateChunk(x, y);
+        }
+    }
 }
 
 // --- Controls ---
@@ -69,7 +106,7 @@ window.addEventListener('keydown', e => {
     }
 
     let reachArea = {x: player.x, y: player.y, w: TILE_SIZE, h: TILE_SIZE};
-    let reach = 20;
+    let reach = 25;
     if (player.facing === 'up') { reachArea.y -= reach; reachArea.h = reach; }
     else if (player.facing === 'down') { reachArea.y += TILE_SIZE; reachArea.h = reach; }
     else if (player.facing === 'left') { reachArea.x -= reach; reachArea.w = reach; }
@@ -77,167 +114,3 @@ window.addEventListener('keydown', e => {
 
     if (e.code === 'Space') {
         for (let i = trees.length - 1; i >= 0; i--) {
-            let t = trees[i];
-            if (reachArea.x < t.x + TILE_SIZE && reachArea.x + reachArea.w > t.x &&
-                reachArea.y < t.y + TILE_SIZE && reachArea.y + reachArea.h > t.y) {
-                t.health -= player.axe_damage;
-                if (t.health <= 0) {
-                    respawnQueue.push({x: t.x, y: t.y, time: Date.now()});
-                    trees.splice(i, 1);
-                    player.wood += Math.floor(Math.random() * 4) + 2;
-                }
-            }
-        }
-    }
-    
-    if (e.key.toLowerCase() === 'e') {
-        if (reachArea.x < merchant.x + TILE_SIZE && reachArea.x + reachArea.w > merchant.x &&
-            reachArea.y < merchant.y + TILE_SIZE && reachArea.y + reachArea.h > merchant.y) {
-            inShop = true;
-            shopDiv.style.display = 'block';
-            updateShopUI();
-        }
-    }
-});
-
-window.addEventListener('keyup', e => { 
-    keys[e.key.toLowerCase()] = false; 
-    keys[e.code] = false; 
-});
-
-// --- Shop Logic ---
-function updateShopUI() {
-    document.getElementById('btn-upgrade').innerText = `Upgrade Axe (${player.axe_level * 50} Platinum) [2]`;
-}
-
-document.getElementById('btn-sell').onclick = () => {
-    if (player.wood > 0) {
-        player.platinum += player.wood * 5;
-        player.wood = 0;
-    }
-};
-
-document.getElementById('btn-upgrade').onclick = () => {
-    let cost = player.axe_level * 50;
-    if (player.platinum >= cost) {
-        player.platinum -= cost;
-        player.axe_level++;
-        player.axe_damage++;
-        updateShopUI();
-    }
-};
-
-document.getElementById('btn-exit').onclick = () => {
-    inShop = false;
-    shopDiv.style.display = 'none';
-};
-
-// --- Game Loop ---
-function update() {
-    if (!inShop) {
-        let dx = 0, dy = 0;
-        if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
-        if (keys['s'] || keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
-        if (keys['a'] || keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
-        if (keys['d'] || keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
-
-        player.x = Math.max(0, Math.min(WIDTH - TILE_SIZE, player.x + dx));
-        player.y = Math.max(0, Math.min(HEIGHT - TILE_SIZE, player.y + dy));
-    }
-
-    let now = Date.now();
-    for (let i = respawnQueue.length - 1; i >= 0; i--) {
-        if (now - respawnQueue[i].time >= RESPAWN_TIME) {
-            trees.push({x: respawnQueue[i].x, y: respawnQueue[i].y, health: 3});
-            respawnQueue.splice(i, 1);
-        }
-    }
-}
-
-function draw() {
-    ctx.fillStyle = 'rgb(86, 125, 70)';
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-    trees.forEach(t => {
-        ctx.fillStyle = 'rgb(101, 67, 33)'; 
-        ctx.fillRect(t.x + 10, t.y + 20, 20, 20);
-        ctx.fillStyle = 'rgb(45, 87, 44)'; 
-        ctx.fillRect(t.x, t.y, TILE_SIZE, TILE_SIZE - 10);
-    });
-
-    ctx.fillStyle = 'rgb(70, 130, 200)';
-    ctx.fillRect(merchant.x, merchant.y, TILE_SIZE, TILE_SIZE);
-    ctx.fillStyle = 'rgb(229, 228, 226)'; 
-    ctx.beginPath();
-    ctx.arc(merchant.x + 20, merchant.y + 20, 8, 0, Math.PI * 2);
-    ctx.fill();
-
-    let px = player.x;
-    let py = player.y;
-
-    ctx.fillStyle = '#1e3f5a';
-    ctx.fillRect(px + 10, py + 30, 8, 10);
-    ctx.fillRect(px + 22, py + 30, 8, 10);
-
-    ctx.fillStyle = '#c83232';
-    ctx.fillRect(px + 8, py + 16, 24, 14);
-    ctx.fillStyle = '#8a1c1c';
-    ctx.fillRect(px + 12, py + 16, 4, 14);
-    ctx.fillRect(px + 20, py + 16, 4, 14);
-    ctx.fillRect(px + 8, py + 20, 24, 4);
-
-    ctx.fillStyle = '#f5c6a5';
-    ctx.fillRect(px + 12, py + 2, 16, 14);
-
-    ctx.fillStyle = '#4a2f1d';
-    if (player.facing === 'up') {
-        ctx.fillRect(px + 12, py + 2, 16, 14); 
-    } else {
-        ctx.fillRect(px + 12, py + 2, 16, 4); 
-        if (player.facing === 'down') {
-            ctx.fillRect(px + 12, py + 12, 16, 4); 
-            ctx.fillStyle = 'black';
-            ctx.fillRect(px + 15, py + 7, 3, 3);
-            ctx.fillRect(px + 22, py + 7, 3, 3);
-        } else if (player.facing === 'left') {
-            ctx.fillRect(px + 12, py + 8, 6, 8); 
-            ctx.fillStyle = 'black';
-            ctx.fillRect(px + 14, py + 7, 3, 3); 
-        } else if (player.facing === 'right') {
-            ctx.fillRect(px + 22, py + 8, 6, 8); 
-            ctx.fillStyle = 'black';
-            ctx.fillRect(px + 23, py + 7, 3, 3); 
-        }
-    }
-
-    if (player.facing === 'right' || player.facing === 'down') {
-        ctx.fillStyle = '#5c4033'; 
-        ctx.fillRect(px + 28, py + 18, 4, 16);
-        ctx.fillStyle = '#bdc3c7'; 
-        ctx.fillRect(px + 30, py + 16, 8, 8);
-    } else if (player.facing === 'left' || player.facing === 'up') {
-        ctx.fillStyle = '#5c4033'; 
-        ctx.fillRect(px + 8, py + 18, 4, 16);
-        ctx.fillStyle = '#bdc3c7'; 
-        ctx.fillRect(px + 2, py + 16, 8, 8);
-    }
-
-    ctx.fillStyle = 'white';
-    ctx.font = '20px Arial';
-    ctx.fillText(`Wood: ${player.wood}`, 10, 30);
-    ctx.fillStyle = 'rgb(229, 228, 226)';
-    ctx.fillText(`Platinum: ${player.platinum}`, 10, 60);
-    ctx.fillStyle = 'white';
-    ctx.fillText(`Axe Lvl: ${player.axe_level} (Dmg: ${player.axe_damage})`, 10, 90);
-}
-
-function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
-}
-
-gameLoop();
-</script>
-</body>
-</html>
