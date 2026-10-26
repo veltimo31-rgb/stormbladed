@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Gandalf & Admin Power Edition</title>
+<title>Stormblade - Secret Admin & Travel Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -106,7 +106,7 @@
     display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.8); border: 2px solid #f39c12; color: #f39c12;
     padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px;
-    z-index: 12; animation: pulse 1s infinite alternate;
+    z-index: 12;
   }
 </style>
 </head>
@@ -189,7 +189,7 @@
 
   <!-- SECRET CHEAT / ADMIN PANEL -->
   <div id="admin-panel" class="modal-shop" style="border-color: #9b59b6;">
-    <h2 style="color: #9b59b6; margin-bottom: 4px;">🧙‍♂️ Gandalf's Secret Admin Panel</h2>
+    <h2 style="color: #9b59b6; margin-bottom: 4px;">🧙‍♂️ Secret Admin Panel</h2>
     
     <div style="margin: 10px 0;">
       <label style="font-size: 12px; color: #aaa;">Target Player (Eyedropper Selection):</label>
@@ -199,7 +199,7 @@
     <button class="shop-btn admin-btn" id="adm-give-plat"><span>💎</span> <span>Give +1,000 Platinum</span></button>
     <button class="shop-btn admin-btn" id="adm-give-wood"><span>🪵</span> <span>Give +100 All Timber</span></button>
     <button class="shop-btn admin-btn" id="adm-give-fish"><span>🐟</span> <span>Give +50 All Treasures</span></button>
-    <button class="shop-btn admin-btn" id="adm-toggle-size"><span>🔍</span> <span id="lbl-size">Toggle Size (Current: 1x)</span></button>
+    <button class="shop-btn admin-btn" id="adm-toggle-size"><span>🔍</span> <span id="lbl-size">Toggle 3x Gandalf Size</span></button>
     <button class="shop-btn admin-btn" id="adm-disco" style="border-color:#f39c12; color:#f39c12;"><span>🪩</span> <span>Trigger 30s Majestic Disco Mode</span></button>
     <button class="shop-btn admin-btn" id="adm-outfits"><span>🎨</span> <span>Unlock All Cosmetics for Self</span></button>
     <button class="shop-btn" id="adm-exit" style="margin-top:10px;"><span>❌</span> <span>Close Panel [E]</span></button>
@@ -279,7 +279,7 @@ window.addEventListener('load', function() {
     const forestMerchant = { x: 120, y: -80 }, forestCrafting = { x: 240, y: -80 };
     const cityMerchant = { x: -160, y: -100 }, cityFisherMarket = { x: 160, y: -100 }, cityIGA = { x: 0, y: -180 };
 
-    // --- SILENT CHEAT CODE LISTENER ("gandalfthewhite") ---
+    // --- SILENT CHEAT LISTENER ---
     const cheatCode = "gandalfthewhite";
     let cheatBuffer = "";
 
@@ -287,20 +287,28 @@ window.addEventListener('load', function() {
         inMenu = true; menuType = 'admin';
         updateTargetDropdown();
         adminDiv.style.display = 'block';
+        spawnPopUp("✨ ADMIN UNLOCKED!", "#9b59b6", player.x, player.y - 45);
     }
 
+    // Global capture listener to ensure cheat keys are logged everywhere
     window.addEventListener('keydown', function(e) {
-        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput) return;
-        let char = e.key.toLowerCase();
+        let activeEl = document.activeElement;
+        if (activeEl === chatInput || activeEl === document.getElementById('room-input') || activeEl === usernameInput) {
+            return;
+        }
+
+        let char = e.key ? e.key.toLowerCase() : "";
         if (char.length === 1 && char >= 'a' && char <= 'z') {
             cheatBuffer += char;
-            if (cheatBuffer.length > cheatCode.length) cheatBuffer = cheatBuffer.substring(cheatBuffer.length - cheatCode.length);
+            if (cheatBuffer.length > cheatCode.length) {
+                cheatBuffer = cheatBuffer.substring(cheatBuffer.length - cheatCode.length);
+            }
             if (cheatBuffer === cheatCode) {
                 cheatBuffer = "";
                 openAdminPanelSilently();
             }
         }
-    });
+    }, true);
 
     // USERNAME MODAL
     document.getElementById('btn-save-name').onclick = function() {
@@ -580,7 +588,7 @@ window.addEventListener('load', function() {
 
     document.getElementById('iga-rename').onclick = () => { exitShop(); usernameInput.value = player.name; nameModal.style.display = 'flex'; };
 
-    // --- TARGETED ADMIN ACTIONS ---
+    // ADMIN TARGET ACTIONS
     function sendAdminGrant(payload) {
         let target = document.getElementById('adm-player-target').value;
         payload.targetId = target;
@@ -607,7 +615,7 @@ window.addEventListener('load', function() {
         } else {
             player.scale = 3.0; player.isGandalf = true;
         }
-        document.getElementById('lbl-size').innerText = `Toggle Size (Current: ${player.scale}x)`;
+        document.getElementById('lbl-size').innerText = `Toggle 3x Gandalf Size (Current: ${player.scale}x)`;
         broadcastPosition();
         saveGame();
     };
@@ -672,7 +680,6 @@ window.addEventListener('load', function() {
     };
 
     function update(dt) {
-        // Disco Timer update
         if (discoActive) {
             let rem = Math.max(0, Math.ceil((discoEndTime - Date.now()) / 1000));
             discoTimerEl.innerText = rem;
@@ -926,7 +933,7 @@ window.addEventListener('load', function() {
             drawPlane(cityPlane.x, cityPlane.y, "PRESS E TO FLY TO FOREST");
         }
 
-        // Other Players (PeerJS Connected)
+        // Other Players
         for (let pid in otherPlayers) {
             let op = otherPlayers[pid];
             if (time - op.lastSeen > 8000 || op.map !== currentMap) continue;
@@ -935,7 +942,7 @@ window.addEventListener('load', function() {
             ctx.fillText(op.name || "Player", op.x+20, op.y - (op.scale > 1.5 ? 45 : 12));
         }
 
-        // Self Character Rendering
+        // Self Character
         drawModel(player.x, player.y, player.facing, player.bodyColor, player.hat, player.isGandalf, player.scale);
         ctx.fillStyle = player.isGandalf ? '#f1c40f' : '#2ecc71'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center'; 
         ctx.fillText(player.name + " (You)", player.x+20, player.y - (player.scale > 1.5 ? 45 : 12));
