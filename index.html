@@ -1,13 +1,55 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Stormblade</title>
+<meta charset="UTF-8">
+<!-- Version Tag to Force Refresh: v2.0 -->
+<title>Stormblade - Infinite Forest</title>
 <style>
-  body { background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; overflow: hidden; }
-  canvas { box-shadow: 0 0 15px #000; }
-  #shop { display: none; position: absolute; background: #282828; border: 3px solid #E5E4E2; padding: 20px; width: 400px; text-align: center; color: white; border-radius: 8px; font-family: 'Courier New', Courier, monospace; }
-  .shop-btn { display: block; margin: 10px auto; padding: 10px; background: #444; color: white; border: 1px solid #E5E4E2; cursor: pointer; width: 80%; font-size: 16px; transition: 0.2s; }
-  .shop-btn:hover { background: #5a7d5a; border-color: white; }
+  body { 
+    background: #111; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    height: 100vh; 
+    margin: 0; 
+    font-family: Arial, sans-serif; 
+    overflow: hidden; 
+  }
+  canvas { 
+    box-shadow: 0 0 20px #000; 
+    border-radius: 4px;
+  }
+  #shop { 
+    display: none; 
+    position: absolute; 
+    background: #222; 
+    border: 3px solid #daa520; 
+    padding: 20px; 
+    width: 380px; 
+    text-align: center; 
+    color: white; 
+    border-radius: 10px; 
+    box-shadow: 0 0 15px rgba(0,0,0,0.8);
+    font-family: 'Georgia', serif;
+  }
+  .shop-btn { 
+    display: block; 
+    margin: 12px auto; 
+    padding: 12px; 
+    background: #333; 
+    color: #daa520; 
+    border: 1px solid #daa520; 
+    cursor: pointer; 
+    width: 85%; 
+    font-size: 15px; 
+    font-weight: bold;
+    border-radius: 5px;
+    transition: 0.2s; 
+  }
+  .shop-btn:hover { 
+    background: #daa520; 
+    color: #111; 
+  }
 </style>
 </head>
 <body>
@@ -15,15 +57,16 @@
 <div id="game-container">
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   <div id="shop">
-    <h2 style="color: #E5E4E2;">Wandering Merchant</h2>
-    <p><i>"Need a sharper blade, traveler?"</i></p>
-    <button class="shop-btn" id="btn-sell">Sell all Wood (5 Plat each) [1]</button>
+    <h2 style="color: #daa520; margin-top:0;">Wandering Merchant</h2>
+    <p style="font-style: italic; color: #ccc;">"Trade your timber for fine platinum!"</p>
+    <button class="shop-btn" id="btn-sell">Sell Wood (5 Plat each) [1]</button>
     <button class="shop-btn" id="btn-upgrade">Upgrade Axe [2]</button>
     <button class="shop-btn" id="btn-exit">Exit Shop [E]</button>
   </div>
 </div>
 
 <script>
+// --- Canvas Setup ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const shopDiv = document.getElementById('shop');
@@ -36,17 +79,29 @@ const RESPAWN_TIME = 20000;
 let inShop = false;
 let keys = {};
 
+// --- Dynamic Grass Texture Generation ---
 const grassCanvas = document.createElement('canvas');
-grassCanvas.width = 100; grassCanvas.height = 100;
+grassCanvas.width = 128; 
+grassCanvas.height = 128;
 const gCtx = grassCanvas.getContext('2d');
-gCtx.fillStyle = '#4f7541'; 
-gCtx.fillRect(0, 0, 100, 100);
-for (let i = 0; i < 400; i++) {
-    gCtx.fillStyle = Math.random() > 0.5 ? '#5b874b' : '#436337'; 
-    gCtx.fillRect(Math.random() * 100, Math.random() * 100, 2, 6 + Math.random() * 4);
+
+// Base Dark Grass
+gCtx.fillStyle = '#3a5a2a'; 
+gCtx.fillRect(0, 0, 128, 128);
+
+// Add Individual Grass Blade Details
+for (let i = 0; i < 600; i++) {
+    gCtx.fillStyle = Math.random() > 0.5 ? '#486d35' : '#2d4720'; 
+    gCtx.fillRect(Math.random() * 128, Math.random() * 128, 2, 5 + Math.random() * 5);
+}
+// Flower patches
+for (let i = 0; i < 12; i++) {
+    gCtx.fillStyle = Math.random() > 0.5 ? '#f1c40f' : '#ffffff';
+    gCtx.fillRect(Math.random() * 128, Math.random() * 128, 3, 3);
 }
 const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
 
+// --- Player & World State ---
 const player = {
     x: 0, y: 0, 
     speed: 4, wood: 0, platinum: 0,
@@ -54,23 +109,25 @@ const player = {
     facing: 'down'
 };
 
-const merchant = { x: 100, y: -100 }; 
+const merchant = { x: 120, y: -80 }; 
 
 let trees = [];
 let chunksGenerated = new Set();
 let respawnQueue = [];
 
+// --- Infinite World Chunk Generation ---
 function generateChunk(cx, cy) {
     let key = cx + ',' + cy;
     if (chunksGenerated.has(key)) return;
     chunksGenerated.add(key);
 
-    let treeCount = Math.floor(Math.random() * 8) + 6; 
+    let treeCount = Math.floor(Math.random() * 9) + 7; 
     for (let i = 0; i < treeCount; i++) {
         let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
         let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
         
-        if (Math.hypot(tx - merchant.x, ty - merchant.y) < 150) continue; 
+        // Don't spawn trees on top of merchant
+        if (Math.hypot(tx - merchant.x, ty - merchant.y) < 140) continue; 
         
         trees.push({ x: tx, y: ty, health: 3, id: Math.random() });
     }
@@ -87,6 +144,7 @@ function updateWorldChunks() {
     }
 }
 
+// --- Controls ---
 window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
     keys[e.code] = true; 
@@ -99,13 +157,4 @@ window.addEventListener('keydown', e => {
     }
 
     let reachArea = {x: player.x, y: player.y, w: TILE_SIZE, h: TILE_SIZE};
-    let reach = 25;
-    if (player.facing === 'up') { reachArea.y -= reach; reachArea.h = reach; }
-    else if (player.facing === 'down') { reachArea.y += TILE_SIZE; reachArea.h = reach; }
-    else if (player.facing === 'left') { reachArea.x -= reach; reachArea.w = reach; }
-    else if (player.facing === 'right') { reachArea.x += TILE_SIZE; reachArea.w = reach; }
-
-    if (e.code === 'Space') {
-        for (let i = trees.length - 1; i >= 0; i--) {
-            let t = trees[i];
-            if (reachArea.x < t.x + TILE_SIZE && reachArea.x + reachArea.w > t
+    let reach =
