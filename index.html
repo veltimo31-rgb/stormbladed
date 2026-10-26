@@ -2,53 +2,61 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- Version Tag to Force Refresh: v2.0 -->
-<title>Stormblade - Infinite Forest</title>
+<title>Stormblade</title>
 <style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body { 
-    background: #111; 
+    background-color: #1a1a1a; 
     display: flex; 
     justify-content: center; 
     align-items: center; 
     height: 100vh; 
-    margin: 0; 
     font-family: Arial, sans-serif; 
     overflow: hidden; 
+    user-select: none;
+  }
+  #game-container {
+    position: relative;
+    width: 800px;
+    height: 600px;
   }
   canvas { 
-    box-shadow: 0 0 20px #000; 
-    border-radius: 4px;
+    background-color: #3b5e2b;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8); 
+    border-radius: 6px;
+    display: block;
   }
   #shop { 
     display: none; 
     position: absolute; 
-    background: #222; 
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #222222; 
     border: 3px solid #daa520; 
-    padding: 20px; 
-    width: 380px; 
+    padding: 25px; 
+    width: 360px; 
     text-align: center; 
     color: white; 
-    border-radius: 10px; 
-    box-shadow: 0 0 15px rgba(0,0,0,0.8);
-    font-family: 'Georgia', serif;
+    border-radius: 8px; 
+    box-shadow: 0 0 25px rgba(0,0,0,0.9);
   }
   .shop-btn { 
     display: block; 
     margin: 12px auto; 
     padding: 12px; 
-    background: #333; 
+    background: #333333; 
     color: #daa520; 
     border: 1px solid #daa520; 
     cursor: pointer; 
-    width: 85%; 
+    width: 90%; 
     font-size: 15px; 
     font-weight: bold;
-    border-radius: 5px;
-    transition: 0.2s; 
+    border-radius: 4px;
   }
   .shop-btn:hover { 
     background: #daa520; 
-    color: #111; 
+    color: #111111; 
   }
 </style>
 </head>
@@ -57,104 +65,353 @@
 <div id="game-container">
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   <div id="shop">
-    <h2 style="color: #daa520; margin-top:0;">Wandering Merchant</h2>
-    <p style="font-style: italic; color: #ccc;">"Trade your timber for fine platinum!"</p>
-    <button class="shop-btn" id="btn-sell">Sell Wood (5 Plat each) [1]</button>
+    <h2 style="color: #daa520; margin-bottom: 10px;">Wandering Merchant</h2>
+    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 15px;">"Trade your timber for fine platinum!"</p>
+    <button class="shop-btn" id="btn-sell">Sell Wood (+5 Plat/ea) [1]</button>
     <button class="shop-btn" id="btn-upgrade">Upgrade Axe [2]</button>
     <button class="shop-btn" id="btn-exit">Exit Shop [E]</button>
   </div>
 </div>
 
 <script>
-// --- Canvas Setup ---
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const shopDiv = document.getElementById('shop');
+window.addEventListener('load', function() {
+    const canvas = document.getElementById('gameCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const shopDiv = document.getElementById('shop');
 
-const TILE_SIZE = 40;
-const WIDTH = 800, HEIGHT = 600;
-const CHUNK_SIZE = 600;
-const RESPAWN_TIME = 20000;
+    const TILE_SIZE = 40;
+    const WIDTH = 800, HEIGHT = 600;
+    const CHUNK_SIZE = 600;
+    const RESPAWN_TIME = 20000;
 
-let inShop = false;
-let keys = {};
+    let inShop = false;
+    let keys = {};
 
-// --- Dynamic Grass Texture Generation ---
-const grassCanvas = document.createElement('canvas');
-grassCanvas.width = 128; 
-grassCanvas.height = 128;
-const gCtx = grassCanvas.getContext('2d');
-
-// Base Dark Grass
-gCtx.fillStyle = '#3a5a2a'; 
-gCtx.fillRect(0, 0, 128, 128);
-
-// Add Individual Grass Blade Details
-for (let i = 0; i < 600; i++) {
-    gCtx.fillStyle = Math.random() > 0.5 ? '#486d35' : '#2d4720'; 
-    gCtx.fillRect(Math.random() * 128, Math.random() * 128, 2, 5 + Math.random() * 5);
-}
-// Flower patches
-for (let i = 0; i < 12; i++) {
-    gCtx.fillStyle = Math.random() > 0.5 ? '#f1c40f' : '#ffffff';
-    gCtx.fillRect(Math.random() * 128, Math.random() * 128, 3, 3);
-}
-const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
-
-// --- Player & World State ---
-const player = {
-    x: 0, y: 0, 
-    speed: 4, wood: 0, platinum: 0,
-    axe_level: 1, axe_damage: 1,
-    facing: 'down'
-};
-
-const merchant = { x: 120, y: -80 }; 
-
-let trees = [];
-let chunksGenerated = new Set();
-let respawnQueue = [];
-
-// --- Infinite World Chunk Generation ---
-function generateChunk(cx, cy) {
-    let key = cx + ',' + cy;
-    if (chunksGenerated.has(key)) return;
-    chunksGenerated.add(key);
-
-    let treeCount = Math.floor(Math.random() * 9) + 7; 
-    for (let i = 0; i < treeCount; i++) {
-        let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
-        let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
-        
-        // Don't spawn trees on top of merchant
-        if (Math.hypot(tx - merchant.x, ty - merchant.y) < 140) continue; 
-        
-        trees.push({ x: tx, y: ty, health: 3, id: Math.random() });
+    // Generate procedural grass texture
+    const grassCanvas = document.createElement('canvas');
+    grassCanvas.width = 64; 
+    grassCanvas.height = 64;
+    const gCtx = grassCanvas.getContext('2d');
+    gCtx.fillStyle = '#3b5e2b'; 
+    gCtx.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 150; i++) {
+        gCtx.fillStyle = (i % 2 === 0) ? '#456d33' : '#314f24'; 
+        gCtx.fillRect(Math.random() * 64, Math.random() * 64, 2, 4);
     }
-}
+    const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
 
-function updateWorldChunks() {
-    let cx = Math.floor(player.x / CHUNK_SIZE);
-    let cy = Math.floor(player.y / CHUNK_SIZE);
-    
-    for (let x = cx - 1; x <= cx + 1; x++) {
-        for (let y = cy - 1; y <= cy + 1; y++) {
-            generateChunk(x, y);
+    // Entities & World
+    const player = {
+        x: 0, y: 0, 
+        speed: 4, wood: 0, platinum: 0,
+        axe_level: 1, axe_damage: 1,
+        facing: 'down'
+    };
+
+    const merchant = { x: 120, y: -80 }; 
+
+    let trees = [];
+    let chunksGenerated = {};
+    let respawnQueue = [];
+
+    function generateChunk(cx, cy) {
+        let key = cx + '_' + cy;
+        if (chunksGenerated[key]) return;
+        chunksGenerated[key] = true;
+
+        let treeCount = Math.floor(Math.random() * 8) + 6; 
+        for (let i = 0; i < treeCount; i++) {
+            let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
+            let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
+            
+            let distToMerchant = Math.sqrt(Math.pow(tx - merchant.x, 2) + Math.pow(ty - merchant.y, 2));
+            if (distToMerchant < 120) continue; 
+            
+            trees.push({ x: tx, y: ty, health: 3 });
         }
     }
-}
 
-// --- Controls ---
-window.addEventListener('keydown', e => {
-    keys[e.key.toLowerCase()] = true;
-    keys[e.code] = true; 
-    
-    if (inShop) {
-        if (e.key === '1') document.getElementById('btn-sell').click();
-        if (e.key === '2') document.getElementById('btn-upgrade').click();
-        if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('btn-exit').click();
-        return; 
+    function updateWorldChunks() {
+        let cx = Math.floor(player.x / CHUNK_SIZE);
+        let cy = Math.floor(player.y / CHUNK_SIZE);
+        
+        for (let x = cx - 1; x <= cx + 1; x++) {
+            for (let y = cy - 1; y <= cy + 1; y++) {
+                generateChunk(x, y);
+            }
+        }
     }
 
-    let reachArea = {x: player.x, y: player.y, w: TILE_SIZE, h: TILE_SIZE};
-    let reach =
+    // Controls
+    window.addEventListener('keydown', function(e) {
+        keys[e.key.toLowerCase()] = true;
+        keys[e.code] = true; 
+        
+        if (inShop) {
+            if (e.key === '1') document.getElementById('btn-sell').click();
+            if (e.key === '2') document.getElementById('btn-upgrade').click();
+            if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('btn-exit').click();
+            return; 
+        }
+
+        let reachArea = {x: player.x, y: player.y, w: TILE_SIZE, h: TILE_SIZE};
+        let reach = 25;
+        if (player.facing === 'up') { reachArea.y -= reach; reachArea.h = reach; }
+        else if (player.facing === 'down') { reachArea.y += TILE_SIZE; reachArea.h = reach; }
+        else if (player.facing === 'left') { reachArea.x -= reach; reachArea.w = reach; }
+        else if (player.facing === 'right') { reachArea.x += TILE_SIZE; reachArea.w = reach; }
+
+        if (e.code === 'Space') {
+            for (let i = trees.length - 1; i >= 0; i--) {
+                let t = trees[i];
+                if (reachArea.x < t.x + TILE_SIZE && reachArea.x + reachArea.w > t.x &&
+                    reachArea.y < t.y + TILE_SIZE && reachArea.y + reachArea.h > t.y) {
+                    t.health -= player.axe_damage;
+                    if (t.health <= 0) {
+                        respawnQueue.push({x: t.x, y: t.y, time: Date.now()});
+                        trees.splice(i, 1);
+                        player.wood += Math.floor(Math.random() * 4) + 2;
+                    }
+                }
+            }
+        }
+        
+        if (e.key.toLowerCase() === 'e') {
+            let mDist = Math.sqrt(Math.pow((merchant.x+20) - (player.x+20), 2) + Math.pow((merchant.y+20) - (player.y+20), 2));
+            if (mDist < 70) {
+                inShop = true;
+                shopDiv.style.display = 'block';
+                updateShopUI();
+            }
+        }
+    });
+
+    window.addEventListener('keyup', function(e) { 
+        keys[e.key.toLowerCase()] = false; 
+        keys[e.code] = false; 
+    });
+
+    // Shop UI Actions
+    function updateShopUI() {
+        document.getElementById('btn-upgrade').innerText = `Upgrade Axe (${player.axe_level * 50} Plat) [2]`;
+    }
+    document.getElementById('btn-sell').onclick = function() {
+        if (player.wood > 0) {
+            player.platinum += player.wood * 5;
+            player.wood = 0;
+        }
+    };
+    document.getElementById('btn-upgrade').onclick = function() {
+        let cost = player.axe_level * 50;
+        if (player.platinum >= cost) {
+            player.platinum -= cost;
+            player.axe_level++;
+            player.axe_damage++;
+            updateShopUI();
+        }
+    };
+    document.getElementById('btn-exit').onclick = function() {
+        inShop = false;
+        shopDiv.style.display = 'none';
+    };
+
+    function update() {
+        if (!inShop) {
+            let dx = 0, dy = 0;
+            if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
+            if (keys['s'] || keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
+            if (keys['a'] || keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
+            if (keys['d'] || keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
+
+            if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+
+            player.x += dx;
+            player.y += dy;
+            
+            updateWorldChunks();
+        }
+
+        let now = Date.now();
+        for (let i = respawnQueue.length - 1; i >= 0; i--) {
+            if (now - respawnQueue[i].time >= RESPAWN_TIME) {
+                trees.push({x: respawnQueue[i].x, y: respawnQueue[i].y, health: 3});
+                respawnQueue.splice(i, 1);
+            }
+        }
+    }
+
+    function draw() {
+        let camX = WIDTH / 2 - player.x - 20;
+        let camY = HEIGHT / 2 - player.y - 20;
+
+        // Background Grass
+        ctx.fillStyle = grassPattern || '#3b5e2b';
+        ctx.save(); 
+        ctx.translate(camX % 64, camY % 64); 
+        ctx.fillRect(-64, -64, WIDTH + 128, HEIGHT + 128);
+        ctx.restore();
+
+        // World Coordinates Camera
+        ctx.save();
+        ctx.translate(camX, camY);
+
+        // Merchant Carpet & NPC
+        ctx.fillStyle = '#781d1d';
+        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 60);
+        ctx.fillStyle = '#f1c40f'; 
+        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 4);
+        ctx.fillRect(merchant.x - 20, merchant.y + 46, 80, 4);
+
+        ctx.fillStyle = '#4a2e16';
+        ctx.fillRect(merchant.x + 8, merchant.y + 8, 24, 26);
+        ctx.fillStyle = '#f5c6a5';
+        ctx.fillRect(merchant.x + 12, merchant.y - 2, 16, 12);
+        ctx.fillStyle = '#ecf0f1';
+        ctx.fillRect(merchant.x + 10, merchant.y + 8, 20, 16);
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(merchant.x + 8, merchant.y - 8, 24, 8);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(merchant.x + 14, merchant.y + 2, 3, 3);
+        ctx.fillRect(merchant.x + 23, merchant.y + 2, 3, 3);
+
+        // Swaying Trees
+        let time = Date.now();
+        for (let i = 0; i < trees.length; i++) {
+            let t = trees[i];
+            if (t.x > player.x - 500 && t.x < player.x + 500 && t.y > player.y - 400 && t.y < player.y + 400) {
+                let sway = Math.sin((time / 350) + t.x) * 3.5; 
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.beginPath();
+                ctx.ellipse(t.x + 20, t.y + 38, 16, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#5c3a21'; 
+                ctx.fillRect(t.x + 14, t.y + 16, 12, 22);
+                
+                ctx.fillStyle = '#274e13'; 
+                ctx.beginPath();
+                ctx.arc(t.x + 20 + sway, t.y, 20, 0, Math.PI * 2); 
+                ctx.arc(t.x + 6 + sway, t.y + 12, 16, 0, Math.PI * 2); 
+                ctx.arc(t.x + 34 + sway, t.y + 12, 16, 0, Math.PI * 2); 
+                ctx.fill();
+
+                ctx.fillStyle = '#386e1d';
+                ctx.beginPath();
+                ctx.arc(t.x + 16 + sway, t.y - 4, 12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Player (Lumberjack)
+        let px = player.x;
+        let py = player.y;
+
+        ctx.fillStyle = '#1b365d';
+        ctx.fillRect(px + 10, py + 30, 8, 10);
+        ctx.fillRect(px + 22, py + 30, 8, 10);
+
+        ctx.fillStyle = '#b02323';
+        ctx.fillRect(px + 8, py + 16, 24, 14);
+        ctx.fillStyle = '#6b1111';
+        ctx.fillRect(px + 12, py + 16, 4, 14);
+        ctx.fillRect(px + 20, py + 16, 4, 14);
+        ctx.fillRect(px + 8, py + 20, 24, 4);
+
+        ctx.fillStyle = '#f5c6a5';
+        ctx.fillRect(px + 12, py + 2, 16, 14);
+        ctx.fillStyle = '#3a2212';
+        if (player.facing === 'up') { 
+            ctx.fillRect(px + 12, py + 2, 16, 14); 
+        } else {
+            ctx.fillRect(px + 12, py + 2, 16, 4); 
+            if (player.facing === 'down') {
+                ctx.fillRect(px + 12, py + 12, 16, 4); 
+                ctx.fillStyle = 'black'; 
+                ctx.fillRect(px + 15, py + 7, 3, 3); 
+                ctx.fillRect(px + 22, py + 7, 3, 3);
+            } else if (player.facing === 'left') {
+                ctx.fillRect(px + 12, py + 8, 6, 8); 
+                ctx.fillStyle = 'black'; 
+                ctx.fillRect(px + 14, py + 7, 3, 3); 
+            } else if (player.facing === 'right') {
+                ctx.fillRect(px + 22, py + 8, 6, 8); 
+                ctx.fillStyle = 'black'; 
+                ctx.fillRect(px + 23, py + 7, 3, 3); 
+            }
+        }
+
+        if (player.facing === 'right' || player.facing === 'down') {
+            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 28, py + 18, 4, 16);
+            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 30, py + 16, 8, 8);
+        } else if (player.facing === 'left' || player.facing === 'up') {
+            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 8, py + 18, 4, 16);
+            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 2, py + 16, 8, 8);
+        }
+
+        ctx.restore(); 
+
+        // HUD Overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(10, 10, 210, 110);
+        ctx.strokeStyle = '#daa520';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(10, 10, 210, 110);
+
+        ctx.fillStyle = '#e67e22';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText(`Wood: ${player.wood}`, 25, 38);
+        
+        ctx.fillStyle = '#e5e4e2';
+        ctx.fillText(`Platinum: ${player.platinum}`, 25, 68);
+        
+        ctx.fillStyle = '#3498db';
+        ctx.fillText(`Axe Lvl: ${player.axe_level} (Dmg ${player.axe_damage})`, 25, 98);
+
+        // Merchant Compass
+        let dxM = (merchant.x + 20) - (player.x + 20);
+        let dyM = (merchant.y + 20) - (player.y + 20);
+        let angle = Math.atan2(dyM, dxM);
+        let dist = Math.sqrt(dxM * dxM + dyM * dyM);
+        
+        if (dist > 250) { 
+            ctx.save();
+            ctx.translate(WIDTH / 2, 35); 
+            ctx.rotate(angle);
+            
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.moveTo(14, 0);
+            ctx.lineTo(-10, -8);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-10, 8);
+            ctx.fill();
+            
+            ctx.restore();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '13px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Merchant: ${Math.floor(dist/10)}m`, WIDTH / 2, 58);
+            ctx.textAlign = 'left'; 
+        } else if (dist < 70) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Press [E] to Shop`, WIDTH / 2, HEIGHT - 40);
+            ctx.textAlign = 'left';
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+});
+</script>
+</body>
+</html>
