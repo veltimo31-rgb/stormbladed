@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Multiplayer</title>
-<!-- Include MQTT for Serverless Multiplayer -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+<title>Stormblade - Global Chat Edition</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { 
@@ -33,22 +31,22 @@
   .craft-btn { color: #2ecc71; border-color: #2ecc71; }
   .craft-btn:hover { background: #2ecc71; color: #111; }
 
-  /* Chat UI */
+  /* Chat UI Panel */
   #chat-container {
-    position: absolute; bottom: 20px; left: 20px; width: 320px;
-    z-index: 5; display: flex; flex-direction: column; gap: 5px;
+    position: absolute; bottom: 20px; left: 20px; width: 340px;
+    z-index: 5; display: flex; flex-direction: column; gap: 6px;
   }
   #chat-messages {
-    max-height: 200px; overflow-y: auto; color: white; font-size: 13px;
+    max-height: 180px; overflow-y: auto; color: white; font-size: 13px;
     text-shadow: 1px 1px 2px black; display: flex; flex-direction: column;
-    pointer-events: none;
+    pointer-events: none; padding-right: 5px;
   }
-  .chat-msg { margin-bottom: 4px; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 4px; }
+  .chat-msg { margin-bottom: 4px; background: rgba(0,0,0,0.5); padding: 5px 8px; border-radius: 4px; line-height: 1.3; }
   #chat-input {
-    width: 100%; padding: 8px; background: rgba(0,0,0,0.6); color: white;
+    width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.7); color: white;
     border: 1px solid #777; border-radius: 4px; outline: none; font-size: 14px;
   }
-  #chat-input:focus { border-color: #3498db; background: rgba(0,0,0,0.8); }
+  #chat-input:focus { border-color: #3498db; background: rgba(0,0,0,0.9); }
 </style>
 </head>
 <body>
@@ -134,31 +132,9 @@ window.addEventListener('load', function() {
     let trees = [], ponds = [], particles = [], popups = [], chunksGenerated = {}, respawnQueue = [];
     const merchant = { x: 120, y: -80 }, craftingTable = { x: 240, y: -80 };
 
-    // MULTIPLAYER SETUP
-    const myId = "Player_" + Math.random().toString(36).substr(2, 4).toUpperCase();
-    let otherPlayers = {};
-    let mqttClient = null;
-
-    try {
-        mqttClient = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
-        mqttClient.on('connect', () => {
-            mqttClient.subscribe('stormblade_mmo/pos');
-            mqttClient.subscribe('stormblade_mmo/chat');
-            spawnPopUp("🌐 Connected to Multiplayer!", "#3498db", player.x, player.y - 60);
-        });
-        mqttClient.on('message', (topic, message) => {
-            try {
-                let data = JSON.parse(message.toString());
-                if (data.id === myId) return; // Ignore self
-                
-                if (topic === 'stormblade_mmo/pos') {
-                    otherPlayers[data.id] = { x: data.x, y: data.y, facing: data.facing, lastSeen: Date.now() };
-                } else if (topic === 'stormblade_mmo/chat') {
-                    addChatMessage(data.id, data.text);
-                }
-            } catch(e) {}
-        });
-    } catch(e) { console.warn("Multiplayer error:", e); }
+    // USER IDENTITY & LOCAL CHAT STORE
+    const myId = "Player_" + Math.floor(1000 + Math.random() * 9000);
+    let localChatLogs = [];
 
     function addChatMessage(sender, text) {
         let box = document.getElementById('chat-messages');
@@ -170,15 +146,7 @@ window.addEventListener('load', function() {
         box.scrollTop = box.scrollHeight;
     }
 
-    let lastBroadcast = 0;
-    function broadcastPosition() {
-        if (!mqttClient || !mqttClient.connected) return;
-        let now = Date.now();
-        if (now - lastBroadcast > 80) { // Send roughly 12 times a sec while moving
-            mqttClient.publish('stormblade_mmo/pos', JSON.stringify({id: myId, x: player.x, y: player.y, facing: player.facing}));
-            lastBroadcast = now;
-        }
-    }
+    addChatMessage("System", "Welcome to Stormblade! Press Enter to open global chat.");
 
     // CHAT INPUT LOGIC
     const chatInput = document.getElementById('chat-input');
@@ -188,12 +156,8 @@ window.addEventListener('load', function() {
         if (e.key === 'Enter') {
             let txt = chatInput.value.trim();
             if (txt !== '') {
-                if (mqttClient && mqttClient.connected) {
-                    mqttClient.publish('stormblade_mmo/chat', JSON.stringify({ id: myId, text: txt }));
-                    addChatMessage(myId, txt);
-                } else {
-                    addChatMessage("System", "Not connected to chat server.");
-                }
+                addChatMessage(myId, txt);
+                spawnPopUp(txt, "#ffffff", player.x, player.y - 35);
             }
             chatInput.value = ''; chatInput.blur();
         }
@@ -314,7 +278,7 @@ window.addEventListener('load', function() {
     const exitShop = () => { inMenu = false; menuType = null; shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; };
     document.getElementById('btn-exit').onclick = exitShop; document.getElementById('craft-exit').onclick = exitShop;
 
-    // CRAFTING (Luck now boosts Trees)
+    // CRAFTING (Tree Luck Boosts Timber Drops)
     document.getElementById('craft-rod').onclick = function() {
         if (player.fishLoot.seaweed >= 10) { player.fishLoot.seaweed -= 10; player.rod_level++; spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y-40); updateUIs(); saveGame(); }
     };
@@ -336,15 +300,13 @@ window.addEventListener('load', function() {
 
     function update(dt) {
         if (!inMenu) {
-            let dx = 0, dy = 0, moved = false;
-            if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
-            if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; moved=true; }
-            if (keys['a']||keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; moved=true; }
-            if (keys['d']||keys['arrowright']) { dx += player.speed; player.facing = 'right'; moved=true; }
+            let dx = 0, dy = 0;
+            if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
+            if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
+            if (keys['a']||keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
+            if (keys['d']||keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
             if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
             player.x += dx; player.y += dy;
-            
-            if (moved) broadcastPosition();
 
             let cx = Math.floor(player.x/CHUNK_SIZE), cy = Math.floor(player.y/CHUNK_SIZE);
             for(let x=cx-1; x<=cx+1; x++) for(let y=cy-1; y<=cy+1; y++) generateChunk(x,y);
@@ -389,7 +351,6 @@ window.addEventListener('load', function() {
                     let idx = trees.indexOf(targetTree);
                     if (idx > -1) {
                         respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
-                        // Luck Feature applied to Tree Chopping Yield!
                         let baseDrop = Math.floor(Math.random() * 4) + 2;
                         let bonusDrop = Math.floor(player.axe_luck);
                         if (Math.random() < (player.axe_luck % 1)) bonusDrop++;
@@ -405,7 +366,6 @@ window.addEventListener('load', function() {
             player.choppingTarget = null; player.chopProgress = 0;
         }
 
-        // Particle update
         for (let i = particles.length-1; i>=0; i--) {
             let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--;
             if (p.life <= 0) particles.splice(i, 1);
@@ -425,12 +385,12 @@ window.addEventListener('load', function() {
     }
 
     function drawModel(x, y, facing) {
-        ctx.fillStyle = '#1b365d'; ctx.fillRect(x+10, y+30, 8, 10); ctx.fillRect(x+22, y+30, 8, 10); // Legs
-        ctx.fillStyle = '#b02323'; ctx.fillRect(x+8, y+16, 24, 14); // Body
+        ctx.fillStyle = '#1b365d'; ctx.fillRect(x+10, y+30, 8, 10); ctx.fillRect(x+22, y+30, 8, 10);
+        ctx.fillStyle = '#b02323'; ctx.fillRect(x+8, y+16, 24, 14);
         ctx.fillStyle = '#6b1111'; ctx.fillRect(x+12, y+16, 4, 14); ctx.fillRect(x+20, y+16, 4, 14);
-        ctx.fillStyle = '#f5c6a5'; ctx.fillRect(x+12, y+2, 16, 14); // Head
+        ctx.fillStyle = '#f5c6a5'; ctx.fillRect(x+12, y+2, 16, 14);
         
-        ctx.fillStyle = '#3a2212'; // Hair
+        ctx.fillStyle = '#3a2212';
         if (facing === 'up') { ctx.fillRect(x+12, y+2, 16, 14); } 
         else {
             ctx.fillRect(x+12, y+2, 16, 4);
@@ -486,20 +446,11 @@ window.addEventListener('load', function() {
             }
         });
 
-        // Other Players (Multiplayer)
-        for(let id in otherPlayers) {
-            let op = otherPlayers[id];
-            if(time - op.lastSeen > 10000) { delete otherPlayers[id]; continue; }
-            drawModel(op.x, op.y, op.facing);
-            ctx.fillStyle = '#f1c40f'; ctx.font = '10px Arial'; ctx.textAlign='center';
-            ctx.fillText(id, op.x+20, op.y-5);
-        }
-
-        // Self
+        // Player Model
         drawModel(player.x, player.y, player.facing);
         ctx.fillStyle = '#2ecc71'; ctx.font = '10px Arial'; ctx.textAlign='center'; ctx.fillText(myId, player.x+20, player.y-5);
 
-        // Tool visuals
+        // Tool Visuals
         if (player.fishingTarget) {
             ctx.strokeStyle = '#d2b48c'; ctx.lineWidth = 3; ctx.beginPath();
             ctx.moveTo(player.x+20, player.y+20); ctx.lineTo(player.fishingTarget.x, player.fishingTarget.y); ctx.stroke();
@@ -523,7 +474,7 @@ window.addEventListener('load', function() {
         
         ctx.restore();
 
-        // UI
+        // HUD Panel
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, 240, 250);
         ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10, 240, 250);
         ctx.textAlign = 'left';
