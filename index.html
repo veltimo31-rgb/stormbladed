@@ -24,7 +24,6 @@
 </div>
 
 <script>
-// --- Game Setup ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const shopDiv = document.getElementById('shop');
@@ -37,44 +36,40 @@ const RESPAWN_TIME = 20000;
 let inShop = false;
 let keys = {};
 
-// --- Generate Grass Texture ---
 const grassCanvas = document.createElement('canvas');
 grassCanvas.width = 100; grassCanvas.height = 100;
 const gCtx = grassCanvas.getContext('2d');
-gCtx.fillStyle = '#4f7541'; // Base dark green
+gCtx.fillStyle = '#4f7541'; 
 gCtx.fillRect(0, 0, 100, 100);
 for (let i = 0; i < 400; i++) {
-    gCtx.fillStyle = Math.random() > 0.5 ? '#5b874b' : '#436337'; // Lighter/Darker blades
+    gCtx.fillStyle = Math.random() > 0.5 ? '#5b874b' : '#436337'; 
     gCtx.fillRect(Math.random() * 100, Math.random() * 100, 2, 6 + Math.random() * 4);
 }
 const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
 
-// --- Entities ---
 const player = {
-    x: 0, y: 0, // Starts at 0,0
+    x: 0, y: 0, 
     speed: 4, wood: 0, platinum: 0,
     axe_level: 1, axe_damage: 1,
     facing: 'down'
 };
 
-const merchant = { x: 100, y: -100 }; // Merchant stands a bit north
+const merchant = { x: 100, y: -100 }; 
 
 let trees = [];
 let chunksGenerated = new Set();
 let respawnQueue = [];
 
-// --- Infinite World Generation ---
 function generateChunk(cx, cy) {
     let key = cx + ',' + cy;
     if (chunksGenerated.has(key)) return;
     chunksGenerated.add(key);
 
-    let treeCount = Math.floor(Math.random() * 8) + 6; // 6 to 13 trees per chunk
+    let treeCount = Math.floor(Math.random() * 8) + 6; 
     for (let i = 0; i < treeCount; i++) {
         let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
         let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
         
-        // Keep clear of merchant spawn
         if (Math.hypot(tx - merchant.x, ty - merchant.y) < 150) continue; 
         
         trees.push({ x: tx, y: ty, health: 3, id: Math.random() });
@@ -85,7 +80,6 @@ function updateWorldChunks() {
     let cx = Math.floor(player.x / CHUNK_SIZE);
     let cy = Math.floor(player.y / CHUNK_SIZE);
     
-    // Generate current chunk and all 8 surrounding chunks
     for (let x = cx - 1; x <= cx + 1; x++) {
         for (let y = cy - 1; y <= cy + 1; y++) {
             generateChunk(x, y);
@@ -93,7 +87,6 @@ function updateWorldChunks() {
     }
 }
 
-// --- Controls ---
 window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
     keys[e.code] = true; 
@@ -114,3 +107,5 @@ window.addEventListener('keydown', e => {
 
     if (e.code === 'Space') {
         for (let i = trees.length - 1; i >= 0; i--) {
+            let t = trees[i];
+            if (reachArea.x < t.x + TILE_SIZE && reachArea.x + reachArea.w > t
