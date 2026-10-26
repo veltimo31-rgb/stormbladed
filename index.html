@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Secret Admin & Travel Edition</title>
+<title>Stormblade - Fixed Secret Admin Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -133,6 +133,7 @@
 
   <div id="multiplayer-bar">
     <button class="mp-btn" id="btn-name-edit">Edit Name</button>
+    <button class="mp-btn" id="btn-secret-admin" style="border-color:#9b59b6; color:#9b59b6;">🧙‍♂️ Admin</button>
     <button class="mp-btn" id="btn-host">Host Room</button>
     <span style="color:#aaa;">OR</span>
     <input type="text" id="room-input" placeholder="CODE" maxlength="5">
@@ -279,7 +280,7 @@ window.addEventListener('load', function() {
     const forestMerchant = { x: 120, y: -80 }, forestCrafting = { x: 240, y: -80 };
     const cityMerchant = { x: -160, y: -100 }, cityFisherMarket = { x: 160, y: -100 }, cityIGA = { x: 0, y: -180 };
 
-    // --- SILENT CHEAT LISTENER ---
+    // --- REFINED CHEAT CODE & HOTKEY LISTENER ---
     const cheatCode = "gandalfthewhite";
     let cheatBuffer = "";
 
@@ -290,10 +291,16 @@ window.addEventListener('load', function() {
         spawnPopUp("✨ ADMIN UNLOCKED!", "#9b59b6", player.x, player.y - 45);
     }
 
-    // Global capture listener to ensure cheat keys are logged everywhere
-    window.addEventListener('keydown', function(e) {
+    // Direct UI button backup trigger
+    document.getElementById('btn-secret-admin').onclick = openAdminPanelSilently;
+
+    document.addEventListener('keydown', function(e) {
         let activeEl = document.activeElement;
-        if (activeEl === chatInput || activeEl === document.getElementById('room-input') || activeEl === usernameInput) {
+        if (activeEl === chatInput || activeEl === document.getElementById('room-input') || activeEl === usernameInput) return;
+
+        // Emergency Instant Shortcut: Shift + A
+        if (e.shiftKey && e.key.toLowerCase() === 'a') {
+            openAdminPanelSilently();
             return;
         }
 
