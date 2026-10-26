@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Gandalf Transformation & City Travel</title>
+<title>Stormblade - Gandalf & Admin Power Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -56,6 +56,12 @@
   .admin-btn { color: #9b59b6; border-color: #9b59b6; }
   .admin-btn:hover { background: #9b59b6; color: #fff; }
 
+  .admin-select {
+    width: 95%; padding: 8px; margin: 6px 0; background: #111;
+    color: #9b59b6; border: 1px solid #9b59b6; border-radius: 4px;
+    font-weight: bold; text-align: center; outline: none;
+  }
+
   /* Name Setter Modal */
   #name-modal {
     position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -95,12 +101,21 @@
     background: #111; z-index: 30; flex-direction: column; justify-content: center;
     align-items: center; color: #f1c40f; font-size: 24px; font-weight: bold;
   }
+
+  #disco-indicator {
+    display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.8); border: 2px solid #f39c12; color: #f39c12;
+    padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px;
+    z-index: 12; animation: pulse 1s infinite alternate;
+  }
 </style>
 </head>
 <body>
 
 <div id="game-container">
   <canvas id="gameCanvas"></canvas>
+
+  <div id="disco-indicator">🪩 DISCO MODE ACTIVE (<span id="disco-timer">30</span>s)</div>
 
   <div id="flight-overlay">
     <div style="font-size: 50px; margin-bottom: 20px;">✈️</div>
@@ -139,7 +154,7 @@
     <button class="shop-btn" id="btn-exit" style="margin-top:12px;"><span>❌</span> <span>Exit Merchant [E]</span></button>
   </div>
 
-  <!-- FISHER MARKET (Replaces Crafting Table in City) -->
+  <!-- FISHER MARKET -->
   <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
     <h2 style="color: #2ecc71; margin-bottom: 6px;">🐟 Fisher Market</h2>
     <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Trade ocean treasures for permanent stat upgrades.</p>
@@ -174,14 +189,19 @@
 
   <!-- SECRET CHEAT / ADMIN PANEL -->
   <div id="admin-panel" class="modal-shop" style="border-color: #9b59b6;">
-    <h2 style="color: #9b59b6; margin-bottom: 4px;">🧙‍♂️ Gandalf's Admin Panel</h2>
-    <p style="font-size: 11px; color:#aaa; margin-bottom:12px;">Cheat Code Activated!</p>
-    <button class="shop-btn admin-btn" id="adm-plat"><span>💎</span> <span>+1,000 Platinum</span></button>
-    <button class="shop-btn admin-btn" id="adm-wood"><span>🪵</span> <span>+100 All Timber Types</span></button>
-    <button class="shop-btn admin-btn" id="adm-fish"><span>🐟</span> <span>+50 All Treasures</span></button>
-    <button class="shop-btn admin-btn" id="adm-stats"><span>⚡</span> <span>Max Speed & Axe Luck</span></button>
-    <button class="shop-btn admin-btn" id="adm-outfits"><span>🎨</span> <span>Unlock All Outfits & Hats</span></button>
-    <button class="shop-btn admin-btn" id="adm-gandalf"><span>🧙‍♂️</span> <span>Toggle 3x Gandalf Mode</span></button>
+    <h2 style="color: #9b59b6; margin-bottom: 4px;">🧙‍♂️ Gandalf's Secret Admin Panel</h2>
+    
+    <div style="margin: 10px 0;">
+      <label style="font-size: 12px; color: #aaa;">Target Player (Eyedropper Selection):</label>
+      <select id="adm-player-target" class="admin-select"></select>
+    </div>
+
+    <button class="shop-btn admin-btn" id="adm-give-plat"><span>💎</span> <span>Give +1,000 Platinum</span></button>
+    <button class="shop-btn admin-btn" id="adm-give-wood"><span>🪵</span> <span>Give +100 All Timber</span></button>
+    <button class="shop-btn admin-btn" id="adm-give-fish"><span>🐟</span> <span>Give +50 All Treasures</span></button>
+    <button class="shop-btn admin-btn" id="adm-toggle-size"><span>🔍</span> <span id="lbl-size">Toggle Size (Current: 1x)</span></button>
+    <button class="shop-btn admin-btn" id="adm-disco" style="border-color:#f39c12; color:#f39c12;"><span>🪩</span> <span>Trigger 30s Majestic Disco Mode</span></button>
+    <button class="shop-btn admin-btn" id="adm-outfits"><span>🎨</span> <span>Unlock All Cosmetics for Self</span></button>
     <button class="shop-btn" id="adm-exit" style="margin-top:10px;"><span>❌</span> <span>Close Panel [E]</span></button>
   </div>
 </div>
@@ -199,6 +219,8 @@ window.addEventListener('load', function() {
     const usernameInput = document.getElementById('username-input');
     const flightOverlay = document.getElementById('flight-overlay');
     const flightText = document.getElementById('flight-text');
+    const discoIndicator = document.getElementById('disco-indicator');
+    const discoTimerEl = document.getElementById('disco-timer');
 
     let WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
     window.addEventListener('resize', () => {
@@ -210,6 +232,8 @@ window.addEventListener('load', function() {
     const TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
     let inMenu = false, menuType = null, keys = {};
     let currentMap = 'forest';
+
+    let discoActive = false, discoEndTime = 0;
 
     const TREE_TYPES = {
         oak: { name: "Oak", color: "#274e13", trunk: "#4a2e16", val: 5, weight: 55 },
@@ -255,22 +279,14 @@ window.addEventListener('load', function() {
     const forestMerchant = { x: 120, y: -80 }, forestCrafting = { x: 240, y: -80 };
     const cityMerchant = { x: -160, y: -100 }, cityFisherMarket = { x: 160, y: -100 }, cityIGA = { x: 0, y: -180 };
 
-    // --- CHEAT CODE LISTENER ("gandalfthewhite") ---
+    // --- SILENT CHEAT CODE LISTENER ("gandalfthewhite") ---
     const cheatCode = "gandalfthewhite";
     let cheatBuffer = "";
 
-    function triggerGandalfMode() {
-        player.isGandalf = true;
-        player.scale = 3.0;
-        player.speed = Math.max(player.speed, 8.0);
-        player.axe_damage = Math.max(player.axe_damage, 10);
-        player.axe_range = Math.max(player.axe_range, 160);
-        player.axe_multi = true;
-        player.platinum += 1000;
-        inMenu = true; menuType = 'admin'; adminDiv.style.display = 'block';
-        spawnPopUp("🧙‍♂️ YOU SHALL NOT PASS! (3x GANDALF ACTIVATED)", "#ffffff", player.x, player.y - 65);
-        broadcastPosition();
-        saveGame();
+    function openAdminPanelSilently() {
+        inMenu = true; menuType = 'admin';
+        updateTargetDropdown();
+        adminDiv.style.display = 'block';
     }
 
     window.addEventListener('keydown', function(e) {
@@ -281,7 +297,7 @@ window.addEventListener('load', function() {
             if (cheatBuffer.length > cheatCode.length) cheatBuffer = cheatBuffer.substring(cheatBuffer.length - cheatCode.length);
             if (cheatBuffer === cheatCode) {
                 cheatBuffer = "";
-                triggerGandalfMode();
+                openAdminPanelSilently();
             }
         }
     });
@@ -309,8 +325,6 @@ window.addEventListener('load', function() {
         box.appendChild(el); box.scrollTop = box.scrollHeight;
     }
 
-    addChatMessage("System", "Type 'gandalfthewhite' anywhere to transform into 3x Gandalf!");
-
     function setupDataConnection(conn) {
         peerConnections.push(conn);
         conn.on('data', (data) => {
@@ -324,9 +338,29 @@ window.addEventListener('load', function() {
                 if (otherPlayers[data.id] && otherPlayers[data.id].map === currentMap) {
                     spawnPopUp(data.text, "#ffffff", otherPlayers[data.id].x, otherPlayers[data.id].y - (otherPlayers[data.id].isGandalf ? 95 : 35));
                 }
+            } else if (data.type === 'admin_grant') {
+                if (data.targetId === 'all' || data.targetId === (peer ? peer.id : 'self')) {
+                    if (data.plat) player.platinum += data.plat;
+                    if (data.wood) { for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+data.wood; }
+                    if (data.fish) { for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+data.fish; }
+                    spawnPopUp("🎁 Gifted by Admin!", "#f1c40f", player.x, player.y - 45);
+                    saveGame();
+                }
+            } else if (data.type === 'trigger_disco') {
+                startDiscoMode();
             }
         });
-        conn.on('close', () => { peerConnections = peerConnections.filter(c => c !== conn); });
+        conn.on('close', () => { peerConnections = peerConnections.filter(c => c !== conn); updateTargetDropdown(); });
+    }
+
+    function updateTargetDropdown() {
+        let sel = document.getElementById('adm-player-target');
+        sel.innerHTML = '<option value="self">Self (' + player.name + ')</option><option value="all">ALL PLAYERS</option>';
+        for (let pid in otherPlayers) {
+            let opt = document.createElement('option');
+            opt.value = pid; opt.innerText = otherPlayers[pid].name + ' (' + pid.substr(0,4) + ')';
+            sel.appendChild(opt);
+        }
     }
 
     document.getElementById('btn-host').onclick = function() {
@@ -399,7 +433,6 @@ window.addEventListener('load', function() {
                 bodyColor: player.bodyColor, hat: player.hat, unlockedOutfits: player.unlockedOutfits, unlockedHats: player.unlockedHats,
                 isGandalf: player.isGandalf, scale: player.scale
             }));
-            spawnPopUp("💾 Game Saved!", "#f1c40f", player.x, player.y - (player.isGandalf ? 95 : 45));
         } catch(e) {}
     }
 
@@ -453,6 +486,12 @@ window.addEventListener('load', function() {
         if (roll < 0.135) return 'sharkTeeth';
         if (roll < 0.415) return 'fishScales';
         return 'seaweed';
+    }
+
+    function startDiscoMode() {
+        discoActive = true;
+        discoEndTime = Date.now() + 30000;
+        discoIndicator.style.display = 'block';
     }
 
     function triggerFlight(targetMap) {
@@ -541,31 +580,49 @@ window.addEventListener('load', function() {
 
     document.getElementById('iga-rename').onclick = () => { exitShop(); usernameInput.value = player.name; nameModal.style.display = 'flex'; };
 
-    // ADMIN CHEAT BUTTONS
-    document.getElementById('adm-plat').onclick = () => { player.platinum += 1000; spawnPopUp("+1000 Platinum!", "#9b59b6", player.x, player.y-40); saveGame(); };
-    document.getElementById('adm-wood').onclick = () => { 
-        for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+100; 
-        spawnPopUp("+100 All Timber!", "#2ecc71", player.x, player.y-40); saveGame(); 
+    // --- TARGETED ADMIN ACTIONS ---
+    function sendAdminGrant(payload) {
+        let target = document.getElementById('adm-player-target').value;
+        payload.targetId = target;
+        if (target === 'self' || target === 'all') {
+            if (payload.plat) player.platinum += payload.plat;
+            if (payload.wood) { for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+payload.wood; }
+            if (payload.fish) { for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+payload.fish; }
+            spawnPopUp("Admin Granted Items!", "#9b59b6", player.x, player.y - 45);
+            saveGame();
+        }
+        if (peerConnections.length > 0) {
+            payload.type = 'admin_grant';
+            peerConnections.forEach(c => { if(c.open) c.send(payload); });
+        }
+    }
+
+    document.getElementById('adm-give-plat').onclick = () => sendAdminGrant({ plat: 1000 });
+    document.getElementById('adm-give-wood').onclick = () => sendAdminGrant({ wood: 100 });
+    document.getElementById('adm-give-fish').onclick = () => sendAdminGrant({ fish: 50 });
+
+    document.getElementById('adm-toggle-size').onclick = () => {
+        if (player.scale === 3.0) {
+            player.scale = 1.0; player.isGandalf = false;
+        } else {
+            player.scale = 3.0; player.isGandalf = true;
+        }
+        document.getElementById('lbl-size').innerText = `Toggle Size (Current: ${player.scale}x)`;
+        broadcastPosition();
+        saveGame();
     };
-    document.getElementById('adm-fish').onclick = () => { 
-        for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+50; 
-        spawnPopUp("+50 All Treasures!", "#3498db", player.x, player.y-40); saveGame(); 
+
+    document.getElementById('adm-disco').onclick = () => {
+        startDiscoMode();
+        if (peerConnections.length > 0) {
+            peerConnections.forEach(c => { if(c.open) c.send({ type: 'trigger_disco' }); });
+        }
     };
-    document.getElementById('adm-stats').onclick = () => { 
-        player.speed += 3.0; player.axe_luck += 5.0; player.axe_damage += 5;
-        spawnPopUp("GOD STATS ACTIVATED!", "#f1c40f", player.x, player.y-40); saveGame(); 
-    };
+
     document.getElementById('adm-outfits').onclick = () => { 
         player.unlockedOutfits = ['#b02323','#c0392b','#2980b9','#27ae60','#2c3e50','#f1c40f'];
         player.unlockedHats = ['none','headband','wizard','crown'];
         spawnPopUp("Unlocked All Cosmetics!", "#e74c3c", player.x, player.y-40); saveGame(); 
-    };
-    document.getElementById('adm-gandalf').onclick = () => {
-        player.isGandalf = !player.isGandalf;
-        player.scale = player.isGandalf ? 3.0 : 1.0;
-        spawnPopUp(player.isGandalf ? "3x Gandalf Mode ON!" : "Gandalf Mode OFF", "#ffffff", player.x, player.y-40);
-        broadcastPosition();
-        saveGame();
     };
 
     function buyOutfit(color, cost) {
@@ -615,6 +672,13 @@ window.addEventListener('load', function() {
     };
 
     function update(dt) {
+        // Disco Timer update
+        if (discoActive) {
+            let rem = Math.max(0, Math.ceil((discoEndTime - Date.now()) / 1000));
+            discoTimerEl.innerText = rem;
+            if (rem <= 0) { discoActive = false; discoIndicator.style.display = 'none'; }
+        }
+
         if (!inMenu && nameModal.style.display !== 'flex') {
             let dx = 0, dy = 0, moved = false;
             if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
@@ -729,29 +793,22 @@ window.addEventListener('load', function() {
         ctx.translate(-20, -20);
 
         if (isGandalf) {
-            // Magical Holy Aura
             let pulse = Math.sin(Date.now() / 150) * 4;
             ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
             ctx.beginPath(); ctx.arc(20, 20, 32 + pulse, 0, Math.PI*2); ctx.fill();
 
-            // White Robes & Belt
             ctx.fillStyle = '#e6e6e6'; ctx.fillRect(8, 16, 24, 24);
             ctx.fillStyle = '#ffffff'; ctx.fillRect(12, 16, 16, 24);
-            ctx.fillStyle = '#d4af37'; ctx.fillRect(10, 26, 20, 3); // Gold Sash
+            ctx.fillStyle = '#d4af37'; ctx.fillRect(10, 26, 20, 3);
 
-            // Boots
             ctx.fillStyle = '#5c4033'; ctx.fillRect(10, 38, 8, 6); ctx.fillRect(22, 38, 8, 6);
-
-            // Skin Head
             ctx.fillStyle = '#f5c6a5'; ctx.fillRect(12, 2, 16, 14);
 
-            // Long Flowing White Beard
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.moveTo(10, 10); ctx.lineTo(30, 10); ctx.lineTo(26, 30); ctx.lineTo(20, 35); ctx.lineTo(14, 30);
             ctx.closePath(); ctx.fill();
 
-            // Eyes
             if (facing !== 'up') {
                 ctx.fillStyle = '#2c3e50';
                 if (facing === 'down') { ctx.fillRect(15, 7, 3, 3); ctx.fillRect(22, 7, 3, 3); }
@@ -759,17 +816,14 @@ window.addEventListener('load', function() {
                 else if (facing === 'right') { ctx.fillRect(24, 7, 3, 3); }
             }
 
-            // Gandalf Wizard Hat
             ctx.fillStyle = '#dcdde1';
             ctx.beginPath(); ctx.moveTo(20, -14); ctx.lineTo(6, 4); ctx.lineTo(34, 4); ctx.fill();
             ctx.fillRect(4, 3, 32, 3);
 
-            // Wizard Wooden Staff with Glowing Orb
             let ox = (facing === 'right' || facing === 'down') ? 34 : -4;
             ctx.fillStyle = '#4a2e16'; ctx.fillRect(ox, -6, 4, 46);
             ctx.fillStyle = '#00d2d3'; ctx.beginPath(); ctx.arc(ox + 2, -8, 5 + pulse*0.5, 0, Math.PI*2); ctx.fill();
         } else {
-            // Standard Hero Model
             ctx.fillStyle = '#1b365d'; ctx.fillRect(10, 30, 8, 10); ctx.fillRect(22, 30, 8, 10);
             ctx.fillStyle = color; ctx.fillRect(8, 16, 24, 14);
             ctx.fillStyle = '#6b1111'; ctx.fillRect(12, 16, 4, 14); ctx.fillRect(20, 16, 4, 14);
@@ -840,7 +894,8 @@ window.addEventListener('load', function() {
                 
                 ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(t.x+40, t.y+75, 32, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = tData.trunk; ctx.fillRect(t.x+28, t.y+35, 24, 45);
-                let leaf = t.type === 'majestic' ? `hsl(${Math.floor((time/10+t.x)%360)}, 85%, 55%)` : tData.color;
+                
+                let leaf = (discoActive || t.type === 'majestic') ? `hsl(${Math.floor((time/10+t.x)%360)}, 85%, 55%)` : tData.color;
                 ctx.fillStyle = leaf;
 
                 if (t.type === 'pine') {
@@ -877,13 +932,13 @@ window.addEventListener('load', function() {
             if (time - op.lastSeen > 8000 || op.map !== currentMap) continue;
             drawModel(op.x, op.y, op.facing, op.bodyColor || '#2980b9', op.hat || 'none', op.isGandalf, op.scale || 1.0);
             ctx.fillStyle = op.isGandalf ? '#f1c40f' : '#3498db'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center';
-            ctx.fillText(op.name || "Player", op.x+20, op.y - (op.isGandalf ? 45 : 12));
+            ctx.fillText(op.name || "Player", op.x+20, op.y - (op.scale > 1.5 ? 45 : 12));
         }
 
         // Self Character Rendering
         drawModel(player.x, player.y, player.facing, player.bodyColor, player.hat, player.isGandalf, player.scale);
         ctx.fillStyle = player.isGandalf ? '#f1c40f' : '#2ecc71'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center'; 
-        ctx.fillText(player.name + " (You)", player.x+20, player.y - (player.isGandalf ? 45 : 12));
+        ctx.fillText(player.name + " (You)", player.x+20, player.y - (player.scale > 1.5 ? 45 : 12));
 
         // Tool Visuals
         if (player.fishingTarget) {
@@ -899,9 +954,9 @@ window.addEventListener('load', function() {
         if (player.choppingTarget || player.fishingTarget) {
             let req = player.choppingTarget ? (10000 / player.axe_damage) : (6000 / player.rod_level);
             let prog = player.choppingTarget ? player.chopProgress : player.fishProgress;
-            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x-10, player.y - (player.isGandalf ? 55 : 22), 60, 10);
+            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x-10, player.y - (player.scale > 1.5 ? 55 : 22), 60, 10);
             ctx.fillStyle = player.choppingTarget ? '#2ecc71' : '#3498db';
-            ctx.fillRect(player.x-8, player.y - (player.isGandalf ? 53 : 20), 56 * Math.min(1, prog/req), 6);
+            ctx.fillRect(player.x-8, player.y - (player.scale > 1.5 ? 53 : 20), 56 * Math.min(1, prog/req), 6);
         }
 
         particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4); });
