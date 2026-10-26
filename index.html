@@ -26,7 +26,7 @@
     border-radius: 6px;
     display: block;
   }
-  #shop { 
+  .modal-shop { 
     display: none; 
     position: absolute; 
     top: 50%;
@@ -34,29 +34,39 @@
     transform: translate(-50%, -50%);
     background: #222222; 
     border: 3px solid #daa520; 
-    padding: 25px; 
-    width: 380px; 
+    padding: 20px; 
+    width: 440px; 
     text-align: center; 
     color: white; 
     border-radius: 8px; 
     box-shadow: 0 0 25px rgba(0,0,0,0.9);
+    z-index: 10;
   }
   .shop-btn { 
     display: block; 
-    margin: 10px auto; 
-    padding: 12px; 
+    margin: 8px auto; 
+    padding: 10px; 
     background: #333333; 
     color: #daa520; 
     border: 1px solid #daa520; 
     cursor: pointer; 
     width: 95%; 
-    font-size: 14px; 
+    font-size: 13px; 
     font-weight: bold;
     border-radius: 4px;
+    transition: 0.2s;
   }
   .shop-btn:hover { 
     background: #daa520; 
     color: #111111; 
+  }
+  .craft-btn {
+    color: #2ecc71;
+    border-color: #2ecc71;
+  }
+  .craft-btn:hover {
+    background: #2ecc71;
+    color: #111111;
   }
 </style>
 </head>
@@ -64,12 +74,26 @@
 
 <div id="game-container">
   <canvas id="gameCanvas" width="800" height="600"></canvas>
-  <div id="shop">
-    <h2 style="color: #daa520; margin-bottom: 8px;">Wandering Merchant</h2>
-    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 12px;">"I trade platinum for all timber types!"</p>
+  
+  <!-- Merchant Shop -->
+  <div id="shop" class="modal-shop">
+    <h2 style="color: #daa520; margin-bottom: 6px;">Wandering Merchant</h2>
+    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 10px;">"I trade platinum for all timber types!"</p>
     <button class="shop-btn" id="btn-sell">Sell All Timber Inventory [1]</button>
-    <button class="shop-btn" id="btn-upgrade">Upgrade Axe [2]</button>
+    <button class="shop-btn" id="btn-upgrade">Upgrade Axe Damage [2]</button>
     <button class="shop-btn" id="btn-exit">Exit Shop [E]</button>
+  </div>
+
+  <!-- Crafting Table Modal -->
+  <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
+    <h2 style="color: #2ecc71; margin-bottom: 6px;">Crafting Table</h2>
+    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 10px;">"Forge fishing treasures into powerful upgrades!"</p>
+    <button class="shop-btn craft-btn" id="craft-rod">Upgrade Rod Speed [1]</button>
+    <button class="shop-btn craft-btn" id="craft-speed">Swift Boots +Speed [2]</button>
+    <button class="shop-btn craft-btn" id="craft-luck">Shark Luck Charm +Luck [3]</button>
+    <button class="shop-btn craft-btn" id="craft-hitbox">Dolphin Ring +Multi-Chop [4]</button>
+    <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;">Timmah's Blessing +ALL STATS [5]</button>
+    <button class="shop-btn" id="craft-exit" style="margin-top:8px;">Exit Crafting [E]</button>
   </div>
 </div>
 
@@ -79,15 +103,19 @@ window.addEventListener('load', function() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const shopDiv = document.getElementById('shop');
+    const craftDiv = document.getElementById('crafting');
 
     const PLAYER_SIZE = 40;
     const TREE_SIZE = 80;
+    const POND_SIZE = 110;
     const WIDTH = 800, HEIGHT = 600;
     const CHUNK_SIZE = 800;
     const RESPAWN_TIME = 25000;
     const BASE_CHOP_TIME = 10000;
+    const BASE_FISH_TIME = 6000;
 
-    let inShop = false;
+    let inMenu = false;
+    let menuType = null;
     let keys = {};
 
     const TREE_TYPES = {
@@ -98,6 +126,15 @@ window.addEventListener('load', function() {
         majestic: { name: "Majestic", color: "rainbow", trunk: "#2c3e50", val: 25, weight: 4  }
     };
 
+    const FISH_TYPES = {
+        seaweed:     { name: "Seaweed",       color: "#2ecc71" },
+        fishScales:  { name: "Fish Scales",   color: "#3498db" },
+        sharkTeeth:  { name: "Shark Teeth",   color: "#95a5a6" },
+        dolphinTail: { name: "Dolphin Tail",  color: "#9b59b6" },
+        timmahsGold: { name: "Timmah's Gold", color: "#f1c40f" }
+    };
+
+    // Procedural grass texture
     const grassCanvas = document.createElement('canvas');
     grassCanvas.width = 64; 
     grassCanvas.height = 64;
@@ -110,20 +147,32 @@ window.addEventListener('load', function() {
     }
     const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
 
+    // Player State
     const player = {
         x: 0, y: 0, 
-        speed: 4, platinum: 0,
+        speed: 4, 
+        platinum: 0,
         inventory: { oak: 0, birch: 0, pine: 0, golden: 0, majestic: 0 },
+        fishLoot: { seaweed: 0, fishScales: 0, sharkTeeth: 0, dolphinTail: 0, timmahsGold: 0 },
         axe_level: 1, axe_damage: 1,
+        axe_range: 85,
+        axe_multi: false,
+        rod_level: 1,
+        rod_luck: 0,
         facing: 'down',
         choppingTarget: null,
-        chopProgress: 0
+        chopProgress: 0,
+        fishingTarget: null,
+        fishProgress: 0
     };
 
     const merchant = { x: 120, y: -80 }; 
+    const craftingTable = { x: 240, y: -80 };
 
     let trees = [];
+    let ponds = [];
     let particles = [];
+    let popups = [];
     let chunksGenerated = {};
     let respawnQueue = [];
     let screenShake = 0;
@@ -143,15 +192,23 @@ window.addEventListener('load', function() {
         if (chunksGenerated[key]) return;
         chunksGenerated[key] = true;
 
-        let treeCount = Math.floor(Math.random() * 6) + 5; 
+        // Generate Trees
+        let treeCount = Math.floor(Math.random() * 5) + 4; 
         for (let i = 0; i < treeCount; i++) {
             let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
             let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
             
             let distToMerchant = Math.sqrt(Math.pow(tx - merchant.x, 2) + Math.pow(ty - merchant.y, 2));
-            if (distToMerchant < 160) continue; 
+            if (distToMerchant < 180) continue; 
             
             trees.push({ id: Math.random(), type: getRandomTreeType(), x: tx, y: ty });
+        }
+
+        // Generate Ponds
+        if (Math.random() < 0.45 && (cx !== 0 || cy !== 0)) {
+            let px = cx * CHUNK_SIZE + 120 + Math.random() * (CHUNK_SIZE - POND_SIZE - 240);
+            let py = cy * CHUNK_SIZE + 120 + Math.random() * (CHUNK_SIZE - POND_SIZE - 240);
+            ponds.push({ id: Math.random(), x: px, y: py, r: 45 + Math.random() * 15 });
         }
     }
 
@@ -164,6 +221,10 @@ window.addEventListener('load', function() {
                 generateChunk(x, y);
             }
         }
+    }
+
+    function spawnPopUp(text, color, x, y) {
+        popups.push({ text: text, color: color, x: x, y: y, life: 45, vy: -1.2 });
     }
 
     function spawnWoodChips(x, y, treeType) {
@@ -182,23 +243,58 @@ window.addEventListener('load', function() {
         }
     }
 
+    function getFishDrop() {
+        let luckMult = 1 + player.rod_luck;
+        let timmahChance = 0.005 * luckMult;  // 0.5% base
+        let dolphinChance = 0.03 * luckMult;  // 3.0% base
+        let sharkChance = 0.10 * luckMult;    // 10.0% base
+        let scaleChance = 0.28 * luckMult;    // 28.0% base
+
+        let roll = Math.random();
+        if (roll < timmahChance) return 'timmahsGold';
+        if (roll < timmahChance + dolphinChance) return 'dolphinTail';
+        if (roll < timmahChance + dolphinChance + sharkChance) return 'sharkTeeth';
+        if (roll < timmahChance + dolphinChance + sharkChance + scaleChance) return 'fishScales';
+        return 'seaweed';
+    }
+
     window.addEventListener('keydown', function(e) {
         keys[e.key.toLowerCase()] = true;
         keys[e.code] = true; 
         
-        if (inShop) {
-            if (e.key === '1') document.getElementById('btn-sell').click();
-            if (e.key === '2') document.getElementById('btn-upgrade').click();
-            if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('btn-exit').click();
+        if (inMenu) {
+            if (menuType === 'shop') {
+                if (e.key === '1') document.getElementById('btn-sell').click();
+                if (e.key === '2') document.getElementById('btn-upgrade').click();
+                if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('btn-exit').click();
+            } else if (menuType === 'crafting') {
+                if (e.key === '1') document.getElementById('craft-rod').click();
+                if (e.key === '2') document.getElementById('craft-speed').click();
+                if (e.key === '3') document.getElementById('craft-luck').click();
+                if (e.key === '4') document.getElementById('craft-hitbox').click();
+                if (e.key === '5') document.getElementById('craft-timmah').click();
+                if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('craft-exit').click();
+            }
             return; 
         }
 
         if (e.key.toLowerCase() === 'e') {
             let mDist = Math.sqrt(Math.pow((merchant.x+20) - (player.x+20), 2) + Math.pow((merchant.y+20) - (player.y+20), 2));
             if (mDist < 80) {
-                inShop = true;
+                inMenu = true;
+                menuType = 'shop';
                 shopDiv.style.display = 'block';
                 updateShopUI();
+                return;
+            }
+
+            let cDist = Math.sqrt(Math.pow((craftingTable.x+20) - (player.x+20), 2) + Math.pow((craftingTable.y+20) - (player.y+20), 2));
+            if (cDist < 80) {
+                inMenu = true;
+                menuType = 'crafting';
+                craftDiv.style.display = 'block';
+                updateCraftingUI();
+                return;
             }
         }
     });
@@ -209,7 +305,15 @@ window.addEventListener('load', function() {
     });
 
     function updateShopUI() {
-        document.getElementById('btn-upgrade').innerText = `Upgrade Axe (${player.axe_level * 50} Plat) [2]`;
+        document.getElementById('btn-upgrade').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat) [2]`;
+    }
+
+    function updateCraftingUI() {
+        document.getElementById('craft-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) [1] - 10 Seaweed (Have: ${player.fishLoot.seaweed})`;
+        document.getElementById('craft-speed').innerText = `Swift Boots (+Speed) [2] - 8 Fish Scales (Have: ${player.fishLoot.fishScales})`;
+        document.getElementById('craft-luck').innerText = `Shark Luck Charm (+Luck) [3] - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth})`;
+        document.getElementById('craft-hitbox').innerText = `Dolphin Ring (+Multi-Chop) [4] - 3 Dolphin Tails (Have: ${player.fishLoot.dolphinTail})`;
+        document.getElementById('craft-timmah').innerText = `Timmah's Blessing (+ALL STATS) [5] - 1 Timmah Gold (Have: ${player.fishLoot.timmahsGold})`;
     }
 
     document.getElementById('btn-sell').onclick = function() {
@@ -232,13 +336,68 @@ window.addEventListener('load', function() {
     };
 
     document.getElementById('btn-exit').onclick = function() {
-        inShop = false;
+        inMenu = false;
+        menuType = null;
         shopDiv.style.display = 'none';
     };
 
-    function getNearbyTree() {
+    // Crafting Actions
+    document.getElementById('craft-rod').onclick = function() {
+        if (player.fishLoot.seaweed >= 10) {
+            player.fishLoot.seaweed -= 10;
+            player.rod_level += 1;
+            spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y - 40);
+            updateCraftingUI();
+        }
+    };
+    document.getElementById('craft-speed').onclick = function() {
+        if (player.fishLoot.fishScales >= 8) {
+            player.fishLoot.fishScales -= 8;
+            player.speed += 1.2;
+            spawnPopUp("Movement Speed Increased!", "#3498db", player.x, player.y - 40);
+            updateCraftingUI();
+        }
+    };
+    document.getElementById('craft-luck').onclick = function() {
+        if (player.fishLoot.sharkTeeth >= 5) {
+            player.fishLoot.sharkTeeth -= 5;
+            player.rod_luck += 0.5;
+            spawnPopUp("Rod Luck Boosted!", "#95a5a6", player.x, player.y - 40);
+            updateCraftingUI();
+        }
+    };
+    document.getElementById('craft-hitbox').onclick = function() {
+        if (player.fishLoot.dolphinTail >= 3) {
+            player.fishLoot.dolphinTail -= 3;
+            player.axe_range += 40;
+            player.axe_multi = true;
+            spawnPopUp("Multi-Tree Chop Unlocked!", "#9b59b6", player.x, player.y - 40);
+            updateCraftingUI();
+        }
+    };
+    document.getElementById('craft-timmah').onclick = function() {
+        if (player.fishLoot.timmahsGold >= 1) {
+            player.fishLoot.timmahsGold -= 1;
+            player.speed += 1.5;
+            player.axe_damage += 2;
+            player.rod_level += 2;
+            player.rod_luck += 1.0;
+            player.axe_range += 30;
+            player.axe_multi = true;
+            spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y - 40);
+            updateCraftingUI();
+        }
+    };
+    document.getElementById('craft-exit').onclick = function() {
+        inMenu = false;
+        menuType = null;
+        craftDiv.style.display = 'none';
+    };
+
+    function getNearbyTrees() {
         let pCenterX = player.x + PLAYER_SIZE / 2;
         let pCenterY = player.y + PLAYER_SIZE / 2;
+        let matched = [];
 
         for (let i = 0; i < trees.length; i++) {
             let t = trees[i];
@@ -246,13 +405,30 @@ window.addEventListener('load', function() {
             let tCenterY = t.y + TREE_SIZE / 2;
             
             let dist = Math.sqrt(Math.pow(pCenterX - tCenterX, 2) + Math.pow(pCenterY - tCenterY, 2));
-            if (dist < 85) return t;
+            if (dist < player.axe_range) {
+                matched.push(t);
+                if (!player.axe_multi) break; 
+            }
+        }
+        return matched;
+    }
+
+    function getNearbyPond() {
+        let pCenterX = player.x + PLAYER_SIZE / 2;
+        let pCenterY = player.y + PLAYER_SIZE / 2;
+
+        for (let i = 0; i < ponds.length; i++) {
+            let p = ponds[i];
+            let dist = Math.sqrt(Math.pow(pCenterX - p.x, 2) + Math.pow(pCenterY - p.y, 2));
+            if (dist < p.r + 45) {
+                return p;
+            }
         }
         return null;
     }
 
     function update(dt) {
-        if (!inShop) {
+        if (!inMenu) {
             let dx = 0, dy = 0;
             if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
             if (keys['s'] || keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
@@ -267,10 +443,52 @@ window.addEventListener('load', function() {
             updateWorldChunks();
         }
 
-        let targetTree = getNearbyTree();
-        if ((keys['Space'] || keys['space']) && targetTree && !inShop) {
-            if (player.choppingTarget !== targetTree) {
-                player.choppingTarget = targetTree;
+        let isHoldingSpace = keys['Space'] || keys['space'];
+        let nearbyTrees = getNearbyTrees();
+        let nearbyPond = getNearbyPond();
+
+        // Fishing Action
+        if (isHoldingSpace && nearbyPond && nearbyTrees.length === 0 && !inMenu) {
+            player.choppingTarget = null;
+            if (player.fishingTarget !== nearbyPond) {
+                player.fishingTarget = nearbyPond;
+                player.fishProgress = 0;
+            }
+
+            let requiredTime = BASE_FISH_TIME / player.rod_level;
+            player.fishProgress += dt;
+
+            if (Math.random() < 0.3) {
+                particles.push({
+                    x: nearbyPond.x + (Math.random() - 0.5) * nearbyPond.r,
+                    y: nearbyPond.y + (Math.random() - 0.5) * nearbyPond.r,
+                    vx: (Math.random() - 0.5) * 1,
+                    vy: (Math.random() - 0.5) * 1,
+                    life: 20,
+                    color: 'rgba(255,255,255,0.6)'
+                });
+            }
+
+            if (player.fishProgress >= requiredTime) {
+                let lootType = getFishDrop();
+                player.fishLoot[lootType] += 1;
+                let lootInfo = FISH_TYPES[lootType];
+                spawnPopUp(`Caught: ${lootInfo.name}!`, lootInfo.color, player.x, player.y - 30);
+                
+                player.fishingTarget = null;
+                player.fishProgress = 0;
+            }
+        } else {
+            player.fishingTarget = null;
+            player.fishProgress = 0;
+        }
+
+        // Tree Chopping Action
+        if (isHoldingSpace && nearbyTrees.length > 0 && !inMenu) {
+            player.fishingTarget = null;
+            let primaryTree = nearbyTrees[0];
+            if (player.choppingTarget !== primaryTree) {
+                player.choppingTarget = primaryTree;
                 player.chopProgress = 0;
             }
 
@@ -278,28 +496,32 @@ window.addEventListener('load', function() {
             player.chopProgress += dt;
 
             if (Math.random() < 0.35) {
-                spawnWoodChips(targetTree.x + TREE_SIZE / 2, targetTree.y + TREE_SIZE / 2, targetTree.type);
+                for (let t of nearbyTrees) {
+                    spawnWoodChips(t.x + TREE_SIZE / 2, t.y + TREE_SIZE / 2, t.type);
+                }
             }
 
             if (player.chopProgress >= requiredTime) {
-                for (let i = 0; i < trees.length; i++) {
-                    if (trees[i] === targetTree) {
-                        respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
-                        player.inventory[targetTree.type] += Math.floor(Math.random() * 4) + 2;
-                        trees.splice(i, 1);
-                        break;
+                for (let targetTree of nearbyTrees) {
+                    for (let i = 0; i < trees.length; i++) {
+                        if (trees[i] === targetTree) {
+                            respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
+                            player.inventory[targetTree.type] += Math.floor(Math.random() * 4) + 2;
+                            trees.splice(i, 1);
+                            break;
+                        }
                     }
                 }
                 player.choppingTarget = null;
                 player.chopProgress = 0;
-                screenShake = targetTree && targetTree.type === 'majestic' ? 20 : 10;
+                screenShake = 12;
             }
-        } else {
+        } else if (!nearbyPond) {
             player.choppingTarget = null;
             player.chopProgress = 0;
         }
 
-        // Spawn ambient particles for Majestic Trees during state update
+        // Majestic Particles
         for (let i = 0; i < trees.length; i++) {
             let t = trees[i];
             if (t.type === 'majestic' && Math.random() < 0.15) {
@@ -314,6 +536,7 @@ window.addEventListener('load', function() {
             }
         }
 
+        // Respawn Timers
         let now = Date.now();
         for (let i = respawnQueue.length - 1; i >= 0; i--) {
             if (now - respawnQueue[i].time >= RESPAWN_TIME) {
@@ -322,12 +545,21 @@ window.addEventListener('load', function() {
             }
         }
 
+        // Particles Update
         for (let i = particles.length - 1; i >= 0; i--) {
             let p = particles[i];
             p.x += p.vx;
             p.y += p.vy;
             p.life--;
             if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Popups Update
+        for (let i = popups.length - 1; i >= 0; i--) {
+            let pop = popups[i];
+            pop.y += pop.vy;
+            pop.life--;
+            if (pop.life <= 0) popups.splice(i, 1);
         }
 
         if (screenShake > 0) screenShake--;
@@ -351,6 +583,28 @@ window.addEventListener('load', function() {
         ctx.save();
         ctx.translate(camX, camY);
 
+        // Render Ponds
+        for (let i = 0; i < ponds.length; i++) {
+            let p = ponds[i];
+            if (p.x > player.x - 600 && p.x < player.x + 600 && p.y > player.y - 500 && p.y < player.y + 500) {
+                ctx.fillStyle = '#2c4c1e';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#2980b9';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#3498db';
+                ctx.beginPath();
+                ctx.arc(p.x - 8, p.y - 8, p.r * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Merchant Structure
         ctx.fillStyle = '#781d1d';
         ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 60);
         ctx.fillStyle = '#f1c40f'; 
@@ -369,9 +623,20 @@ window.addEventListener('load', function() {
         ctx.fillRect(merchant.x + 14, merchant.y + 2, 3, 3);
         ctx.fillRect(merchant.x + 23, merchant.y + 2, 3, 3);
 
-        let time = Date.now();
-        let nearbyTree = getNearbyTree();
+        // Crafting Table Structure
+        ctx.fillStyle = '#5c3a21';
+        ctx.fillRect(craftingTable.x - 10, craftingTable.y - 5, 60, 50);
+        ctx.fillStyle = '#2ecc71';
+        ctx.fillRect(craftingTable.x - 12, craftingTable.y - 8, 64, 12);
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(craftingTable.x + 16, craftingTable.y + 15, 8, 16);
+        ctx.fillRect(craftingTable.x + 10, craftingTable.y + 12, 20, 8);
 
+        let time = Date.now();
+        let nearbyTrees = getNearbyTrees();
+        let nearbyPond = getNearbyPond();
+
+        // Render Trees
         for (let i = 0; i < trees.length; i++) {
             let t = trees[i];
             if (t.x > player.x - 600 && t.x < player.x + 600 && t.y > player.y - 500 && t.y < player.y + 500) {
@@ -424,7 +689,7 @@ window.addEventListener('load', function() {
                     ctx.fill();
                 }
 
-                if (t === nearbyTree && !player.choppingTarget) {
+                if (nearbyTrees.includes(t) && !player.choppingTarget) {
                     ctx.save();
                     ctx.fillStyle = 'rgba(0,0,0,0.85)';
                     ctx.fillRect(t.x - 15, t.y - 35, 110, 26);
@@ -441,12 +706,41 @@ window.addEventListener('load', function() {
             }
         }
 
+        // Pond Prompt
+        if (nearbyPond && nearbyTrees.length === 0 && !player.fishingTarget) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(nearbyPond.x - 45, nearbyPond.y - 20, 90, 26);
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(nearbyPond.x - 45, nearbyPond.y - 20, 90, 26);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Fish [SPACE]`, nearbyPond.x, nearbyPond.y - 3);
+            ctx.restore();
+        }
+
+        // Particles
         for (let i = 0; i < particles.length; i++) {
             let p = particles[i];
             ctx.fillStyle = p.color;
             ctx.fillRect(p.x, p.y, 4, 4);
         }
 
+        // Popups
+        for (let i = 0; i < popups.length; i++) {
+            let pop = popups[i];
+            ctx.save();
+            ctx.fillStyle = pop.color;
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(pop.text, pop.x + PLAYER_SIZE/2, pop.y);
+            ctx.restore();
+        }
+
+        // Player Model
         let px = player.x;
         let py = player.y;
 
@@ -484,21 +778,34 @@ window.addEventListener('load', function() {
             }
         }
 
-        if (player.facing === 'right' || player.facing === 'down') {
-            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 28, py + 18, 4, 16);
-            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 30, py + 16, 8, 8);
-        } else if (player.facing === 'left' || player.facing === 'up') {
-            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 8, py + 18, 4, 16);
-            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 2, py + 16, 8, 8);
+        // Held Tool Visuals
+        if (player.fishingTarget) {
+            ctx.strokeStyle = '#d2b48c';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(px + 20, py + 20);
+            ctx.lineTo(player.fishingTarget.x, player.fishingTarget.y);
+            ctx.stroke();
+        } else {
+            if (player.facing === 'right' || player.facing === 'down') {
+                ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 28, py + 18, 4, 16);
+                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 30, py + 16, 8, 8);
+            } else if (player.facing === 'left' || player.facing === 'up') {
+                ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 8, py + 18, 4, 16);
+                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 2, py + 16, 8, 8);
+            }
         }
 
-        if (player.choppingTarget) {
-            let requiredTime = BASE_CHOP_TIME / player.axe_damage;
-            let ratio = Math.min(1, player.chopProgress / requiredTime);
+        // Progress Bar
+        if (player.choppingTarget || player.fishingTarget) {
+            let req = player.choppingTarget ? (BASE_CHOP_TIME / player.axe_damage) : (BASE_FISH_TIME / player.rod_level);
+            let prog = player.choppingTarget ? player.chopProgress : player.fishProgress;
+            let ratio = Math.min(1, prog / req);
+            let barColor = player.choppingTarget ? '#2ecc71' : '#3498db';
 
             ctx.fillStyle = 'rgba(0,0,0,0.8)';
             ctx.fillRect(px - 10, py - 18, 60, 10);
-            ctx.fillStyle = '#2ecc71';
+            ctx.fillStyle = barColor;
             ctx.fillRect(px - 8, py - 16, 56 * ratio, 6);
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 1;
@@ -507,60 +814,61 @@ window.addEventListener('load', function() {
 
         ctx.restore(); 
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(10, 10, 220, 160);
+        // HUD Inventory Panel
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(10, 10, 240, 250);
         ctx.strokeStyle = '#daa520';
         ctx.lineWidth = 2;
-        ctx.strokeRect(10, 10, 220, 160);
+        ctx.strokeRect(10, 10, 240, 250);
 
         ctx.fillStyle = '#daa520';
-        ctx.font = 'bold 15px Arial';
-        ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 32);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 30);
 
+        ctx.fillStyle = '#e67e22';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(`--- TIMBER ---`, 20, 50);
         ctx.fillStyle = '#ffffff';
-        ctx.font = '12px Arial';
-        ctx.fillText(`🪵 Oak: ${player.inventory.oak}`, 20, 54);
-        ctx.fillText(`🤍 Birch: ${player.inventory.birch}`, 20, 72);
-        ctx.fillText(`🌲 Pine: ${player.inventory.pine}`, 20, 90);
-        ctx.fillText(`⭐ Golden: ${player.inventory.golden}`, 20, 108);
-
+        ctx.font = '11px Arial';
+        ctx.fillText(`🪵 Oak: ${player.inventory.oak} | 🤍 Birch: ${player.inventory.birch}`, 20, 68);
+        ctx.fillText(`🌲 Pine: ${player.inventory.pine} | ⭐ Golden: ${player.inventory.golden}`, 20, 84);
         ctx.fillStyle = 'hsl(' + Math.floor((time/10)%360) + ', 100%, 70%)';
-        ctx.fillText(`🌈 Majestic: ${player.inventory.majestic}`, 20, 126);
+        ctx.fillText(`🌈 Majestic: ${player.inventory.majestic}`, 20, 100);
 
         ctx.fillStyle = '#3498db';
-        ctx.font = '12px Arial';
-        ctx.fillText(`🪓 Axe Lvl ${player.axe_level} (${(10 / player.axe_damage).toFixed(1)}s chop)`, 20, 150);
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(`--- FISHING TREASURES ---`, 20, 122);
+        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial';
+        ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed}`, 20, 140);
+        ctx.fillStyle = '#3498db';
+        ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales}`, 20, 156);
+        ctx.fillStyle = '#95a5a6';
+        ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth}`, 20, 172);
+        ctx.fillStyle = '#9b59b6';
+        ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail}`, 20, 188);
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold}`, 20, 204);
 
-        let dxM = (merchant.x + 20) - (player.x + 20);
-        let dyM = (merchant.y + 20) - (player.y + 20);
-        let angle = Math.atan2(dyM, dxM);
-        let dist = Math.sqrt(dxM * dxM + dyM * dyM);
-        
-        if (dist > 250) { 
-            ctx.save();
-            ctx.translate(WIDTH / 2, 35); 
-            ctx.rotate(angle);
-            
-            ctx.fillStyle = '#e74c3c';
-            ctx.beginPath();
-            ctx.moveTo(14, 0);
-            ctx.lineTo(-10, -8);
-            ctx.lineTo(-4, 0);
-            ctx.lineTo(-10, 8);
-            ctx.fill();
-            
-            ctx.restore();
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '13px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Merchant: ${Math.floor(dist/10)}m`, WIDTH / 2, 58);
-            ctx.textAlign = 'left'; 
-        } else if (dist < 80) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '11px Arial';
+        ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
+        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🍀 Luck: +${(player.rod_luck * 100).toFixed(0)}%`, 20, 246);
+
+        // Merchant / Crafting Distance Prompts
+        let mDist = Math.sqrt(Math.pow((merchant.x+20) - (player.x+20), 2) + Math.pow((merchant.y+20) - (player.y+20), 2));
+        let cDist = Math.sqrt(Math.pow((craftingTable.x+20) - (player.x+20), 2) + Math.pow((craftingTable.y+20) - (player.y+20), 2));
+
+        if (mDist < 80) {
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(`Press [E] to Shop`, WIDTH / 2, HEIGHT - 40);
+            ctx.fillText(`Press [E] for Merchant Shop`, WIDTH / 2, HEIGHT - 40);
+            ctx.textAlign = 'left';
+        } else if (cDist < 80) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Press [E] for Crafting Table`, WIDTH / 2, HEIGHT - 40);
             ctx.textAlign = 'left';
         }
     }
