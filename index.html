@@ -3,96 +3,76 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade</title>
+<title>Stormblade - Multiplayer</title>
+<!-- Include MQTT for Serverless Multiplayer -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { 
-    width: 100%;
-    height: 100%;
-    margin: 0; 
-    padding: 0; 
-    background-color: #1a1a1a; 
-    font-family: Arial, sans-serif; 
-    overflow: hidden; 
-    user-select: none;
+    width: 100%; height: 100%; margin: 0; padding: 0; 
+    background-color: #1a1a1a; font-family: Arial, sans-serif; 
+    overflow: hidden; user-select: none;
   }
-  #game-container {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-  }
-  canvas { 
-    width: 100vw;
-    height: 100vh;
-    background-color: #3b5e2b;
-    display: block;
-  }
+  #game-container { position: relative; width: 100vw; height: 100vh; }
+  canvas { width: 100vw; height: 100vh; background-color: #3b5e2b; display: block; }
+  
   .modal-shop { 
-    display: none; 
-    position: absolute; 
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: #222222; 
-    border: 3px solid #daa520; 
-    padding: 20px; 
-    width: 440px; 
-    max-width: 90vw;
-    text-align: center; 
-    color: white; 
-    border-radius: 8px; 
-    box-shadow: 0 0 25px rgba(0,0,0,0.9);
-    z-index: 10;
+    display: none; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); background: #222; 
+    border: 3px solid #daa520; padding: 20px; width: 440px; 
+    max-width: 90vw; text-align: center; color: white; 
+    border-radius: 8px; box-shadow: 0 0 25px rgba(0,0,0,0.9); z-index: 10;
   }
   .shop-btn { 
-    display: block; 
-    margin: 8px auto; 
-    padding: 10px; 
-    background: #333333; 
-    color: #daa520; 
-    border: 1px solid #daa520; 
-    cursor: pointer; 
-    width: 95%; 
-    font-size: 13px; 
-    font-weight: bold;
-    border-radius: 4px;
-    transition: 0.2s;
+    display: block; margin: 8px auto; padding: 10px; 
+    background: #333; color: #daa520; border: 1px solid #daa520; 
+    cursor: pointer; width: 95%; font-size: 13px; font-weight: bold;
+    border-radius: 4px; transition: 0.2s;
   }
-  .shop-btn:hover { 
-    background: #daa520; 
-    color: #111111; 
+  .shop-btn:hover { background: #daa520; color: #111; }
+  .craft-btn { color: #2ecc71; border-color: #2ecc71; }
+  .craft-btn:hover { background: #2ecc71; color: #111; }
+
+  /* Chat UI */
+  #chat-container {
+    position: absolute; bottom: 20px; left: 20px; width: 320px;
+    z-index: 5; display: flex; flex-direction: column; gap: 5px;
   }
-  .craft-btn {
-    color: #2ecc71;
-    border-color: #2ecc71;
+  #chat-messages {
+    max-height: 200px; overflow-y: auto; color: white; font-size: 13px;
+    text-shadow: 1px 1px 2px black; display: flex; flex-direction: column;
+    pointer-events: none;
   }
-  .craft-btn:hover {
-    background: #2ecc71;
-    color: #111111;
+  .chat-msg { margin-bottom: 4px; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 4px; }
+  #chat-input {
+    width: 100%; padding: 8px; background: rgba(0,0,0,0.6); color: white;
+    border: 1px solid #777; border-radius: 4px; outline: none; font-size: 14px;
   }
+  #chat-input:focus { border-color: #3498db; background: rgba(0,0,0,0.8); }
 </style>
 </head>
 <body>
 
 <div id="game-container">
   <canvas id="gameCanvas"></canvas>
+
+  <div id="chat-container">
+    <div id="chat-messages"></div>
+    <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
+  </div>
   
-  <!-- Merchant Shop -->
   <div id="shop" class="modal-shop">
     <h2 style="color: #daa520; margin-bottom: 6px;">Wandering Merchant</h2>
-    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 10px;">"I trade platinum for all timber types!"</p>
     <button class="shop-btn" id="btn-sell">Sell All Timber Inventory [1]</button>
     <button class="shop-btn" id="btn-upgrade">Upgrade Axe Damage [2]</button>
     <button class="shop-btn" id="btn-exit">Exit Shop [E]</button>
   </div>
 
-  <!-- Crafting Table Modal -->
   <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
     <h2 style="color: #2ecc71; margin-bottom: 6px;">Crafting Table</h2>
-    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 10px;">"Forge fishing treasures into powerful upgrades!"</p>
     <button class="shop-btn craft-btn" id="craft-rod">Upgrade Rod Speed [1]</button>
     <button class="shop-btn craft-btn" id="craft-speed">Swift Boots +Speed [2]</button>
-    <button class="shop-btn craft-btn" id="craft-luck">Shark Luck Charm +Luck [3]</button>
+    <button class="shop-btn craft-btn" id="craft-luck">Shark Luck Charm +Tree Luck [3]</button>
     <button class="shop-btn craft-btn" id="craft-hitbox">Dolphin Ring +Multi-Chop [4]</button>
     <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;">Timmah's Blessing +ALL STATS [5]</button>
     <button class="shop-btn" id="craft-exit" style="margin-top:8px;">Exit Crafting [E]</button>
@@ -107,142 +87,144 @@ window.addEventListener('load', function() {
     const shopDiv = document.getElementById('shop');
     const craftDiv = document.getElementById('crafting');
 
-    let WIDTH = window.innerWidth;
-    let HEIGHT = window.innerHeight;
+    let WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        WIDTH = canvas.width; HEIGHT = canvas.height;
+    });
+    canvas.width = WIDTH; canvas.height = HEIGHT;
 
-    function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        WIDTH = canvas.width;
-        HEIGHT = canvas.height;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    const PLAYER_SIZE = 40;
-    const TREE_SIZE = 80;
-    const POND_SIZE = 110;
-    const CHUNK_SIZE = 800;
-    const RESPAWN_TIME = 25000;
-    const BASE_CHOP_TIME = 10000;
-    const BASE_FISH_TIME = 6000;
-
-    let inMenu = false;
-    let menuType = null;
-    let keys = {};
+    const PLAYER_SIZE = 40, TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
+    let inMenu = false, menuType = null, keys = {};
 
     const TREE_TYPES = {
-        oak:      { name: "Oak",      color: "#274e13", trunk: "#4a2e16", val: 5,  weight: 55 },
-        birch:    { name: "Birch",    color: "#80a832", trunk: "#e0e0e0", val: 7,  weight: 22 },
-        pine:     { name: "Pine",     color: "#0f381e", trunk: "#3d220f", val: 10, weight: 12 },
-        golden:   { name: "Golden",   color: "#f39c12", trunk: "#6e4213", val: 15, weight: 7  },
-        majestic: { name: "Majestic", color: "rainbow", trunk: "#2c3e50", val: 25, weight: 4  }
+        oak: { name: "Oak", color: "#274e13", trunk: "#4a2e16", val: 5, weight: 55 },
+        birch: { name: "Birch", color: "#80a832", trunk: "#e0e0e0", val: 7, weight: 22 },
+        pine: { name: "Pine", color: "#0f381e", trunk: "#3d220f", val: 10, weight: 12 },
+        golden: { name: "Golden", color: "#f39c12", trunk: "#6e4213", val: 15, weight: 7 },
+        majestic: { name: "Majestic", color: "rainbow", trunk: "#2c3e50", val: 25, weight: 4 }
     };
-
     const FISH_TYPES = {
-        seaweed:     { name: "Seaweed",       color: "#2ecc71" },
-        fishScales:  { name: "Fish Scales",   color: "#3498db" },
-        sharkTeeth:  { name: "Shark Teeth",   color: "#95a5a6" },
-        dolphinTail: { name: "Dolphin Tail",  color: "#9b59b6" },
+        seaweed: { name: "Seaweed", color: "#2ecc71" },
+        fishScales: { name: "Fish Scales", color: "#3498db" },
+        sharkTeeth: { name: "Shark Teeth", color: "#95a5a6" },
+        dolphinTail: { name: "Dolphin Tail", color: "#9b59b6" },
         timmahsGold: { name: "Timmah's Gold", color: "#f1c40f" }
     };
 
     const grassCanvas = document.createElement('canvas');
-    grassCanvas.width = 64; 
-    grassCanvas.height = 64;
+    grassCanvas.width = 64; grassCanvas.height = 64;
     const gCtx = grassCanvas.getContext('2d');
-    gCtx.fillStyle = '#3b5e2b'; 
-    gCtx.fillRect(0, 0, 64, 64);
-    for (let i = 0; i < 150; i++) {
-        gCtx.fillStyle = (i % 2 === 0) ? '#456d33' : '#314f24'; 
-        gCtx.fillRect(Math.random() * 64, Math.random() * 64, 2, 4);
+    gCtx.fillStyle = '#3b5e2b'; gCtx.fillRect(0, 0, 64, 64);
+    for (let i=0; i<150; i++) {
+        gCtx.fillStyle = (i%2===0) ? '#456d33' : '#314f24';
+        gCtx.fillRect(Math.random()*64, Math.random()*64, 2, 4);
     }
     const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
 
-    // Player State
     const player = {
-        x: 0, y: 0, 
-        speed: 4, 
-        platinum: 0,
-        inventory: { oak: 0, birch: 0, pine: 0, golden: 0, majestic: 0 },
-        fishLoot: { seaweed: 0, fishScales: 0, sharkTeeth: 0, dolphinTail: 0, timmahsGold: 0 },
-        axe_level: 1, axe_damage: 1,
-        axe_range: 85,
-        axe_multi: false,
-        rod_level: 1,
-        rod_luck: 0,
-        facing: 'down',
-        choppingTarget: null,
-        chopProgress: 0,
-        fishingTarget: null,
-        fishProgress: 0
+        x: 0, y: 0, speed: 4, platinum: 0,
+        inventory: { oak:0, birch:0, pine:0, golden:0, majestic:0 },
+        fishLoot: { seaweed:0, fishScales:0, sharkTeeth:0, dolphinTail:0, timmahsGold:0 },
+        axe_level: 1, axe_damage: 1, axe_range: 85, axe_multi: false, axe_luck: 0,
+        rod_level: 1, facing: 'down',
+        choppingTarget: null, chopProgress: 0, fishingTarget: null, fishProgress: 0
     };
 
-    const merchant = { x: 120, y: -80 }; 
-    const craftingTable = { x: 240, y: -80 };
+    let trees = [], ponds = [], particles = [], popups = [], chunksGenerated = {}, respawnQueue = [];
+    const merchant = { x: 120, y: -80 }, craftingTable = { x: 240, y: -80 };
 
-    let trees = [];
-    let ponds = [];
-    let particles = [];
-    let popups = [];
-    let chunksGenerated = {};
-    let respawnQueue = [];
-    let screenShake = 0;
+    // MULTIPLAYER SETUP
+    const myId = "Player_" + Math.random().toString(36).substr(2, 4).toUpperCase();
+    let otherPlayers = {};
+    let mqttClient = null;
 
-    function spawnPopUp(text, color, x, y) {
-        popups.push({ text: text, color: color, x: x, y: y, life: 45, vy: -1.2 });
+    try {
+        mqttClient = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
+        mqttClient.on('connect', () => {
+            mqttClient.subscribe('stormblade_mmo/pos');
+            mqttClient.subscribe('stormblade_mmo/chat');
+            spawnPopUp("🌐 Connected to Multiplayer!", "#3498db", player.x, player.y - 60);
+        });
+        mqttClient.on('message', (topic, message) => {
+            try {
+                let data = JSON.parse(message.toString());
+                if (data.id === myId) return; // Ignore self
+                
+                if (topic === 'stormblade_mmo/pos') {
+                    otherPlayers[data.id] = { x: data.x, y: data.y, facing: data.facing, lastSeen: Date.now() };
+                } else if (topic === 'stormblade_mmo/chat') {
+                    addChatMessage(data.id, data.text);
+                }
+            } catch(e) {}
+        });
+    } catch(e) { console.warn("Multiplayer error:", e); }
+
+    function addChatMessage(sender, text) {
+        let box = document.getElementById('chat-messages');
+        let el = document.createElement('div');
+        el.className = 'chat-msg';
+        let color = sender === myId ? '#f1c40f' : '#3498db';
+        el.innerHTML = `<strong style="color:${color}">${sender}:</strong> ${text}`;
+        box.appendChild(el);
+        box.scrollTop = box.scrollHeight;
     }
 
-    // --- Safe Save & Load System ---
+    let lastBroadcast = 0;
+    function broadcastPosition() {
+        if (!mqttClient || !mqttClient.connected) return;
+        let now = Date.now();
+        if (now - lastBroadcast > 80) { // Send roughly 12 times a sec while moving
+            mqttClient.publish('stormblade_mmo/pos', JSON.stringify({id: myId, x: player.x, y: player.y, facing: player.facing}));
+            lastBroadcast = now;
+        }
+    }
+
+    // CHAT INPUT LOGIC
+    const chatInput = document.getElementById('chat-input');
+    chatInput.addEventListener('keydown', e => e.stopPropagation());
+    chatInput.addEventListener('keyup', e => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            let txt = chatInput.value.trim();
+            if (txt !== '') {
+                if (mqttClient && mqttClient.connected) {
+                    mqttClient.publish('stormblade_mmo/chat', JSON.stringify({ id: myId, text: txt }));
+                    addChatMessage(myId, txt);
+                } else {
+                    addChatMessage("System", "Not connected to chat server.");
+                }
+            }
+            chatInput.value = ''; chatInput.blur();
+        }
+    });
+
+    // SAVING LOGIC
     function saveGame() {
         try {
-            const saveData = {
-                x: player.x,
-                y: player.y,
-                speed: player.speed,
-                platinum: player.platinum,
-                inventory: player.inventory,
-                fishLoot: player.fishLoot,
-                axe_level: player.axe_level,
-                axe_damage: player.axe_damage,
-                axe_range: player.axe_range,
-                axe_multi: player.axe_multi,
-                rod_level: player.rod_level,
-                rod_luck: player.rod_luck
-            };
-            localStorage.setItem('stormblade_save', JSON.stringify(saveData));
+            localStorage.setItem('stormblade_save', JSON.stringify({
+                x: player.x, y: player.y, speed: player.speed, platinum: player.platinum,
+                inventory: player.inventory, fishLoot: player.fishLoot,
+                axe_level: player.axe_level, axe_damage: player.axe_damage, axe_range: player.axe_range,
+                axe_multi: player.axe_multi, axe_luck: player.axe_luck, rod_level: player.rod_level
+            }));
             spawnPopUp("💾 Game Saved!", "#f1c40f", player.x, player.y - 45);
-        } catch(e) {
-            console.warn("Storage save failed:", e);
-        }
+        } catch(e) {}
     }
 
     function loadGame() {
         try {
-            const dataStr = localStorage.getItem('stormblade_save');
-            if (dataStr) {
-                const data = JSON.parse(dataStr);
-                if (data.x !== undefined) player.x = data.x;
-                if (data.y !== undefined) player.y = data.y;
-                if (data.speed !== undefined) player.speed = data.speed;
-                if (data.platinum !== undefined) player.platinum = data.platinum;
-                if (data.inventory) Object.assign(player.inventory, data.inventory);
-                if (data.fishLoot) Object.assign(player.fishLoot, data.fishLoot);
-                if (data.axe_level !== undefined) player.axe_level = data.axe_level;
-                if (data.axe_damage !== undefined) player.axe_damage = data.axe_damage;
-                if (data.axe_range !== undefined) player.axe_range = data.axe_range;
-                if (data.axe_multi !== undefined) player.axe_multi = data.axe_multi;
-                if (data.rod_level !== undefined) player.rod_level = data.rod_level;
-                if (data.rod_luck !== undefined) player.rod_luck = data.rod_luck;
+            let str = localStorage.getItem('stormblade_save');
+            if (str) {
+                let d = JSON.parse(str);
+                Object.assign(player, d);
             }
-        } catch(e) {
-            console.warn("Storage load failed:", e);
-        }
+        } catch(e) {}
     }
-
     loadGame();
     setInterval(saveGame, 10000);
 
+    // WORLD GENERATION
     function getRandomTreeType() {
         let rand = Math.random() * 100;
         let cumulative = 0;
@@ -257,705 +239,319 @@ window.addEventListener('load', function() {
         let key = cx + '_' + cy;
         if (chunksGenerated[key]) return;
         chunksGenerated[key] = true;
-
-        let treeCount = Math.floor(Math.random() * 5) + 4; 
-        for (let i = 0; i < treeCount; i++) {
+        let count = Math.floor(Math.random() * 5) + 4; 
+        for (let i = 0; i < count; i++) {
             let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
             let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
-            
-            let distToMerchant = Math.sqrt(Math.pow(tx - merchant.x, 2) + Math.pow(ty - merchant.y, 2));
-            if (distToMerchant < 180) continue; 
-            
-            trees.push({ id: Math.random(), type: getRandomTreeType(), x: tx, y: ty });
+            if (Math.hypot(tx - merchant.x, ty - merchant.y) < 180) continue; 
+            trees.push({ type: getRandomTreeType(), x: tx, y: ty });
         }
-
         if (Math.random() < 0.45 && (cx !== 0 || cy !== 0)) {
             let px = cx * CHUNK_SIZE + 120 + Math.random() * (CHUNK_SIZE - POND_SIZE - 240);
             let py = cy * CHUNK_SIZE + 120 + Math.random() * (CHUNK_SIZE - POND_SIZE - 240);
-            ponds.push({ id: Math.random(), x: px, y: py, r: 45 + Math.random() * 15 });
+            ponds.push({ x: px, y: py, r: 45 + Math.random() * 15 });
         }
     }
 
-    function updateWorldChunks() {
-        let cx = Math.floor(player.x / CHUNK_SIZE);
-        let cy = Math.floor(player.y / CHUNK_SIZE);
-        
-        for (let x = cx - 1; x <= cx + 1; x++) {
-            for (let y = cy - 1; y <= cy + 1; y++) {
-                generateChunk(x, y);
-            }
-        }
-    }
-
-    function spawnWoodChips(x, y, treeType) {
-        let chipColor = (TREE_TYPES[treeType] && TREE_TYPES[treeType].trunk) || '#4a2e16';
-        if (treeType === 'majestic') chipColor = 'hsl(' + Math.floor(Math.random() * 360) + ', 100%, 60%)';
-        else if (treeType === 'golden') chipColor = '#f1c40f';
-
-        for (let i = 0; i < 4; i++) {
-            particles.push({
-                x: x, y: y,
-                vx: (Math.random() - 0.5) * 5,
-                vy: (Math.random() - 0.5) * 5,
-                life: 18,
-                color: chipColor
-            });
-        }
-    }
+    function spawnPopUp(text, color, x, y) { popups.push({ text, color, x, y, life: 45, vy: -1.2 }); }
 
     function getFishDrop() {
-        let luckMult = 1 + player.rod_luck;
-        let timmahChance = 0.005 * luckMult;
-        let dolphinChance = 0.03 * luckMult;
-        let sharkChance = 0.10 * luckMult;
-        let scaleChance = 0.28 * luckMult;
-
         let roll = Math.random();
-        if (roll < timmahChance) return 'timmahsGold';
-        if (roll < timmahChance + dolphinChance) return 'dolphinTail';
-        if (roll < timmahChance + dolphinChance + sharkChance) return 'sharkTeeth';
-        if (roll < timmahChance + dolphinChance + sharkChance + scaleChance) return 'fishScales';
+        if (roll < 0.005) return 'timmahsGold';
+        if (roll < 0.035) return 'dolphinTail';
+        if (roll < 0.135) return 'sharkTeeth';
+        if (roll < 0.415) return 'fishScales';
         return 'seaweed';
     }
 
     window.addEventListener('keydown', function(e) {
-        keys[e.key.toLowerCase()] = true;
-        keys[e.code] = true; 
+        if (document.activeElement === chatInput) return;
+        if (e.key === 'Enter') { chatInput.focus(); return; }
+
+        keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
         
         if (inMenu) {
-            if (menuType === 'shop') {
-                if (e.key === '1') document.getElementById('btn-sell').click();
-                if (e.key === '2') document.getElementById('btn-upgrade').click();
-                if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('btn-exit').click();
-            } else if (menuType === 'crafting') {
-                if (e.key === '1') document.getElementById('craft-rod').click();
-                if (e.key === '2') document.getElementById('craft-speed').click();
-                if (e.key === '3') document.getElementById('craft-luck').click();
-                if (e.key === '4') document.getElementById('craft-hitbox').click();
-                if (e.key === '5') document.getElementById('craft-timmah').click();
-                if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById('craft-exit').click();
-            }
+            let ui = menuType === 'shop' ? ['btn-sell','btn-upgrade'] : ['craft-rod','craft-speed','craft-luck','craft-hitbox','craft-timmah'];
+            let exitBtn = menuType === 'shop' ? 'btn-exit' : 'craft-exit';
+            let num = parseInt(e.key);
+            if (num > 0 && num <= ui.length) document.getElementById(ui[num-1]).click();
+            if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById(exitBtn).click();
             return; 
         }
 
         if (e.key.toLowerCase() === 'e') {
-            let mDist = Math.sqrt(Math.pow((merchant.x+20) - (player.x+20), 2) + Math.pow((merchant.y+20) - (player.y+20), 2));
-            if (mDist < 80) {
-                inMenu = true;
-                menuType = 'shop';
-                shopDiv.style.display = 'block';
-                updateShopUI();
-                return;
-            }
-
-            let cDist = Math.sqrt(Math.pow((craftingTable.x+20) - (player.x+20), 2) + Math.pow((craftingTable.y+20) - (player.y+20), 2));
-            if (cDist < 80) {
-                inMenu = true;
-                menuType = 'crafting';
-                craftDiv.style.display = 'block';
-                updateCraftingUI();
-                return;
+            if (Math.hypot(merchant.x+20 - (player.x+20), merchant.y+20 - (player.y+20)) < 80) {
+                inMenu = true; menuType = 'shop'; shopDiv.style.display = 'block'; updateUIs();
+            } else if (Math.hypot(craftingTable.x+20 - (player.x+20), craftingTable.y+20 - (player.y+20)) < 80) {
+                inMenu = true; menuType = 'crafting'; craftDiv.style.display = 'block'; updateUIs();
             }
         }
     });
 
     window.addEventListener('keyup', function(e) { 
-        keys[e.key.toLowerCase()] = false; 
-        keys[e.code] = false; 
+        keys[e.key.toLowerCase()] = false; keys[e.code] = false; 
     });
 
-    function updateShopUI() {
+    function updateUIs() {
         document.getElementById('btn-upgrade').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat) [2]`;
-    }
-
-    function updateCraftingUI() {
-        document.getElementById('craft-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) [1] - 10 Seaweed (Have: ${player.fishLoot.seaweed || 0})`;
-        document.getElementById('craft-speed').innerText = `Swift Boots (+Speed) [2] - 8 Fish Scales (Have: ${player.fishLoot.fishScales || 0})`;
-        document.getElementById('craft-luck').innerText = `Shark Luck Charm (+Luck) [3] - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth || 0})`;
-        document.getElementById('craft-hitbox').innerText = `Dolphin Ring (+Multi-Chop) [4] - 3 Dolphin Tails (Have: ${player.fishLoot.dolphinTail || 0})`;
-        document.getElementById('craft-timmah').innerText = `Timmah's Blessing (+ALL STATS) [5] - 1 Timmah Gold (Have: ${player.fishLoot.timmahsGold || 0})`;
+        document.getElementById('craft-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) [1] - 10 Seaweed (Have: ${player.fishLoot.seaweed||0})`;
+        document.getElementById('craft-speed').innerText = `Swift Boots (+Speed) [2] - 8 Fish Scales (Have: ${player.fishLoot.fishScales||0})`;
+        document.getElementById('craft-luck').innerText = `Shark Luck Charm (+Tree Luck) [3] - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth||0})`;
+        document.getElementById('craft-hitbox').innerText = `Dolphin Ring (+Multi-Chop) [4] - 3 Dolphin Tails (Have: ${player.fishLoot.dolphinTail||0})`;
+        document.getElementById('craft-timmah').innerText = `Timmah's Blessing (+ALL STATS) [5] - 1 Timmah Gold (Have: ${player.fishLoot.timmahsGold||0})`;
     }
 
     document.getElementById('btn-sell').onclick = function() {
         let earned = 0;
-        for (let type in player.inventory) {
-            let val = (TREE_TYPES[type] && TREE_TYPES[type].val) || 5;
-            earned += (player.inventory[type] || 0) * val;
-            player.inventory[type] = 0;
-        }
-        player.platinum += earned;
-        saveGame();
+        for (let t in player.inventory) { earned += (player.inventory[t]||0) * TREE_TYPES[t].val; player.inventory[t] = 0; }
+        player.platinum += earned; saveGame();
     };
-
     document.getElementById('btn-upgrade').onclick = function() {
-        let cost = player.axe_level * 50;
-        if (player.platinum >= cost) {
-            player.platinum -= cost;
-            player.axe_level++;
-            player.axe_damage++;
-            updateShopUI();
-            saveGame();
+        if (player.platinum >= player.axe_level * 50) {
+            player.platinum -= player.axe_level * 50; player.axe_level++; player.axe_damage++; updateUIs(); saveGame();
         }
     };
+    const exitShop = () => { inMenu = false; menuType = null; shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; };
+    document.getElementById('btn-exit').onclick = exitShop; document.getElementById('craft-exit').onclick = exitShop;
 
-    document.getElementById('btn-exit').onclick = function() {
-        inMenu = false;
-        menuType = null;
-        shopDiv.style.display = 'none';
-    };
-
+    // CRAFTING (Luck now boosts Trees)
     document.getElementById('craft-rod').onclick = function() {
-        if ((player.fishLoot.seaweed || 0) >= 10) {
-            player.fishLoot.seaweed -= 10;
-            player.rod_level += 1;
-            spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y - 40);
-            updateCraftingUI();
-            saveGame();
-        }
+        if (player.fishLoot.seaweed >= 10) { player.fishLoot.seaweed -= 10; player.rod_level++; spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y-40); updateUIs(); saveGame(); }
     };
     document.getElementById('craft-speed').onclick = function() {
-        if ((player.fishLoot.fishScales || 0) >= 8) {
-            player.fishLoot.fishScales -= 8;
-            player.speed += 1.2;
-            spawnPopUp("Movement Speed Increased!", "#3498db", player.x, player.y - 40);
-            updateCraftingUI();
-            saveGame();
-        }
+        if (player.fishLoot.fishScales >= 8) { player.fishLoot.fishScales -= 8; player.speed += 1.2; spawnPopUp("Speed Increased!", "#3498db", player.x, player.y-40); updateUIs(); saveGame(); }
     };
     document.getElementById('craft-luck').onclick = function() {
-        if ((player.fishLoot.sharkTeeth || 0) >= 5) {
-            player.fishLoot.sharkTeeth -= 5;
-            player.rod_luck += 0.5;
-            spawnPopUp("Rod Luck Boosted!", "#95a5a6", player.x, player.y - 40);
-            updateCraftingUI();
-            saveGame();
-        }
+        if (player.fishLoot.sharkTeeth >= 5) { player.fishLoot.sharkTeeth -= 5; player.axe_luck += 1.0; spawnPopUp("Tree Luck Boosted!", "#95a5a6", player.x, player.y-40); updateUIs(); saveGame(); }
     };
     document.getElementById('craft-hitbox').onclick = function() {
-        if ((player.fishLoot.dolphinTail || 0) >= 3) {
-            player.fishLoot.dolphinTail -= 3;
-            player.axe_range += 40;
-            player.axe_multi = true;
-            spawnPopUp("Multi-Tree Chop Unlocked!", "#9b59b6", player.x, player.y - 40);
-            updateCraftingUI();
-            saveGame();
-        }
+        if (player.fishLoot.dolphinTail >= 3) { player.fishLoot.dolphinTail -= 3; player.axe_range += 40; player.axe_multi = true; spawnPopUp("Multi-Chop Unlocked!", "#9b59b6", player.x, player.y-40); updateUIs(); saveGame(); }
     };
     document.getElementById('craft-timmah').onclick = function() {
-        if ((player.fishLoot.timmahsGold || 0) >= 1) {
-            player.fishLoot.timmahsGold -= 1;
-            player.speed += 1.5;
-            player.axe_damage += 2;
-            player.rod_level += 2;
-            player.rod_luck += 1.0;
-            player.axe_range += 30;
-            player.axe_multi = true;
-            spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y - 40);
-            updateCraftingUI();
-            saveGame();
+        if (player.fishLoot.timmahsGold >= 1) { 
+            player.fishLoot.timmahsGold--; player.speed += 1.5; player.axe_damage += 2; player.rod_level += 2; player.axe_luck += 2.0; player.axe_range += 30; player.axe_multi = true; 
+            spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y-40); updateUIs(); saveGame(); 
         }
     };
-    document.getElementById('craft-exit').onclick = function() {
-        inMenu = false;
-        menuType = null;
-        craftDiv.style.display = 'none';
-    };
-
-    function getNearbyTrees() {
-        let pCenterX = player.x + PLAYER_SIZE / 2;
-        let pCenterY = player.y + PLAYER_SIZE / 2;
-        let matched = [];
-
-        for (let i = 0; i < trees.length; i++) {
-            let t = trees[i];
-            let tCenterX = t.x + TREE_SIZE / 2;
-            let tCenterY = t.y + TREE_SIZE / 2;
-            
-            let dist = Math.sqrt(Math.pow(pCenterX - tCenterX, 2) + Math.pow(pCenterY - tCenterY, 2));
-            if (dist < player.axe_range) {
-                matched.push(t);
-                if (!player.axe_multi) break; 
-            }
-        }
-        return matched;
-    }
-
-    function getNearbyPond() {
-        let pCenterX = player.x + PLAYER_SIZE / 2;
-        let pCenterY = player.y + PLAYER_SIZE / 2;
-
-        for (let i = 0; i < ponds.length; i++) {
-            let p = ponds[i];
-            let dist = Math.sqrt(Math.pow(pCenterX - p.x, 2) + Math.pow(pCenterY - p.y, 2));
-            if (dist < p.r + 45) {
-                return p;
-            }
-        }
-        return null;
-    }
 
     function update(dt) {
         if (!inMenu) {
-            let dx = 0, dy = 0;
-            if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
-            if (keys['s'] || keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
-            if (keys['a'] || keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
-            if (keys['d'] || keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
-
+            let dx = 0, dy = 0, moved = false;
+            if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
+            if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; moved=true; }
+            if (keys['a']||keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; moved=true; }
+            if (keys['d']||keys['arrowright']) { dx += player.speed; player.facing = 'right'; moved=true; }
             if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-
-            player.x += dx;
-            player.y += dy;
+            player.x += dx; player.y += dy;
             
-            updateWorldChunks();
+            if (moved) broadcastPosition();
+
+            let cx = Math.floor(player.x/CHUNK_SIZE), cy = Math.floor(player.y/CHUNK_SIZE);
+            for(let x=cx-1; x<=cx+1; x++) for(let y=cy-1; y<=cy+1; y++) generateChunk(x,y);
         }
 
-        let isHoldingSpace = keys['Space'] || keys['space'];
-        let nearbyTrees = getNearbyTrees();
-        let nearbyPond = getNearbyPond();
-
-        // Fishing Action
-        if (isHoldingSpace && nearbyPond && nearbyTrees.length === 0 && !inMenu) {
-            player.choppingTarget = null;
-            if (player.fishingTarget !== nearbyPond) {
-                player.fishingTarget = nearbyPond;
-                player.fishProgress = 0;
+        let isSpace = keys['Space'] || keys['space'];
+        let pCenter = {x: player.x+20, y: player.y+20};
+        
+        let matchedTrees = [];
+        for (let t of trees) {
+            if (Math.hypot(pCenter.x - (t.x+40), pCenter.y - (t.y+40)) < player.axe_range) {
+                matchedTrees.push(t); if(!player.axe_multi) break;
             }
+        }
+        let nearbyPond = ponds.find(p => Math.hypot(pCenter.x - p.x, pCenter.y - p.y) < p.r + 45);
 
-            let requiredTime = BASE_FISH_TIME / player.rod_level;
+        if (isSpace && nearbyPond && matchedTrees.length===0 && !inMenu) {
+            player.choppingTarget = null;
+            if (player.fishingTarget !== nearbyPond) { player.fishingTarget = nearbyPond; player.fishProgress = 0; }
             player.fishProgress += dt;
-
-            if (Math.random() < 0.3) {
-                particles.push({
-                    x: nearbyPond.x + (Math.random() - 0.5) * nearbyPond.r,
-                    y: nearbyPond.y + (Math.random() - 0.5) * nearbyPond.r,
-                    vx: (Math.random() - 0.5) * 1,
-                    vy: (Math.random() - 0.5) * 1,
-                    life: 20,
-                    color: 'rgba(255,255,255,0.6)'
+            if (Math.random() < 0.3) particles.push({ x: nearbyPond.x+(Math.random()-0.5)*nearbyPond.r, y: nearbyPond.y+(Math.random()-0.5)*nearbyPond.r, vx: (Math.random()-0.5)*1, vy: (Math.random()-0.5)*1, life: 20, color: 'rgba(255,255,255,0.6)' });
+            
+            if (player.fishProgress >= 6000 / player.rod_level) {
+                let loot = getFishDrop(); player.fishLoot[loot] = (player.fishLoot[loot]||0) + 1;
+                spawnPopUp(`Caught: ${FISH_TYPES[loot].name}!`, FISH_TYPES[loot].color, player.x, player.y-30);
+                player.fishingTarget = null; player.fishProgress = 0;
+            }
+        } else if (isSpace && matchedTrees.length>0 && !inMenu) {
+            player.fishingTarget = null;
+            let target = matchedTrees[0];
+            if (player.choppingTarget !== target) { player.choppingTarget = target; player.chopProgress = 0; }
+            player.chopProgress += dt;
+            
+            if (Math.random()<0.35) {
+                matchedTrees.forEach(t => {
+                    for(let i=0;i<3;i++) particles.push({ x: t.x+40, y: t.y+40, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, life:18, color: TREE_TYPES[t.type].trunk });
                 });
             }
 
-            if (player.fishProgress >= requiredTime) {
-                let lootType = getFishDrop();
-                player.fishLoot[lootType] = (player.fishLoot[lootType] || 0) + 1;
-                let lootInfo = FISH_TYPES[lootType] || { name: lootType, color: '#fff' };
-                spawnPopUp(`Caught: ${lootInfo.name}!`, lootInfo.color, player.x, player.y - 30);
-                
-                player.fishingTarget = null;
-                player.fishProgress = 0;
+            if (player.chopProgress >= 10000 / player.axe_damage) {
+                matchedTrees.forEach(targetTree => {
+                    let idx = trees.indexOf(targetTree);
+                    if (idx > -1) {
+                        respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
+                        // Luck Feature applied to Tree Chopping Yield!
+                        let baseDrop = Math.floor(Math.random() * 4) + 2;
+                        let bonusDrop = Math.floor(player.axe_luck);
+                        if (Math.random() < (player.axe_luck % 1)) bonusDrop++;
+                        
+                        player.inventory[targetTree.type] = (player.inventory[targetTree.type]||0) + baseDrop + bonusDrop;
+                        trees.splice(idx, 1);
+                    }
+                });
+                player.choppingTarget = null; player.chopProgress = 0;
             }
         } else {
-            player.fishingTarget = null;
-            player.fishProgress = 0;
+            player.fishingTarget = null; player.fishProgress = 0;
+            player.choppingTarget = null; player.chopProgress = 0;
         }
 
-        // Tree Chopping Action
-        if (isHoldingSpace && nearbyTrees.length > 0 && !inMenu) {
-            player.fishingTarget = null;
-            let primaryTree = nearbyTrees[0];
-            if (player.choppingTarget !== primaryTree) {
-                player.choppingTarget = primaryTree;
-                player.chopProgress = 0;
-            }
-
-            let requiredTime = BASE_CHOP_TIME / player.axe_damage;
-            player.chopProgress += dt;
-
-            if (Math.random() < 0.35) {
-                for (let t of nearbyTrees) {
-                    spawnWoodChips(t.x + TREE_SIZE / 2, t.y + TREE_SIZE / 2, t.type);
-                }
-            }
-
-            if (player.chopProgress >= requiredTime) {
-                for (let targetTree of nearbyTrees) {
-                    for (let i = 0; i < trees.length; i++) {
-                        if (trees[i] === targetTree) {
-                            respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
-                            let type = targetTree.type || 'oak';
-                            player.inventory[type] = (player.inventory[type] || 0) + (Math.floor(Math.random() * 4) + 2);
-                            trees.splice(i, 1);
-                            break;
-                        }
-                    }
-                }
-                player.choppingTarget = null;
-                player.chopProgress = 0;
-                screenShake = 12;
-            }
-        } else if (!nearbyPond) {
-            player.choppingTarget = null;
-            player.chopProgress = 0;
+        // Particle update
+        for (let i = particles.length-1; i>=0; i--) {
+            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--;
+            if (p.life <= 0) particles.splice(i, 1);
         }
-
-        // Majestic Particles
-        for (let i = 0; i < trees.length; i++) {
-            let t = trees[i];
-            if (t.type === 'majestic' && Math.random() < 0.15) {
-                particles.push({
-                    x: t.x + Math.random() * TREE_SIZE,
-                    y: t.y + Math.random() * (TREE_SIZE - 20),
-                    vx: (Math.random() - 0.5) * 1.5,
-                    vy: -Math.random() * 2,
-                    life: 25,
-                    color: 'hsl(' + Math.floor(Math.random() * 360) + ', 100%, 70%)'
-                });
-            }
+        for (let i = popups.length-1; i>=0; i--) {
+            popups[i].y += popups[i].vy; popups[i].life--;
+            if (popups[i].life <= 0) popups.splice(i, 1);
         }
-
-        // Respawn Timers
+        
         let now = Date.now();
-        for (let i = respawnQueue.length - 1; i >= 0; i--) {
-            if (now - respawnQueue[i].time >= RESPAWN_TIME) {
-                trees.push({id: Math.random(), type: getRandomTreeType(), x: respawnQueue[i].x, y: respawnQueue[i].y});
+        for (let i = respawnQueue.length-1; i>=0; i--) {
+            if (now - respawnQueue[i].time >= 25000) {
+                trees.push({ type: getRandomTreeType(), x: respawnQueue[i].x, y: respawnQueue[i].y });
                 respawnQueue.splice(i, 1);
             }
         }
+    }
 
-        // Particles Update
-        for (let i = particles.length - 1; i >= 0; i--) {
-            let p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life--;
-            if (p.life <= 0) particles.splice(i, 1);
+    function drawModel(x, y, facing) {
+        ctx.fillStyle = '#1b365d'; ctx.fillRect(x+10, y+30, 8, 10); ctx.fillRect(x+22, y+30, 8, 10); // Legs
+        ctx.fillStyle = '#b02323'; ctx.fillRect(x+8, y+16, 24, 14); // Body
+        ctx.fillStyle = '#6b1111'; ctx.fillRect(x+12, y+16, 4, 14); ctx.fillRect(x+20, y+16, 4, 14);
+        ctx.fillStyle = '#f5c6a5'; ctx.fillRect(x+12, y+2, 16, 14); // Head
+        
+        ctx.fillStyle = '#3a2212'; // Hair
+        if (facing === 'up') { ctx.fillRect(x+12, y+2, 16, 14); } 
+        else {
+            ctx.fillRect(x+12, y+2, 16, 4);
+            if (facing === 'down') { ctx.fillStyle='black'; ctx.fillRect(x+15, y+7, 3,3); ctx.fillRect(x+22, y+7, 3,3); }
+            else if (facing === 'left') { ctx.fillStyle='black'; ctx.fillRect(x+14, y+7, 3,3); }
+            else if (facing === 'right') { ctx.fillStyle='black'; ctx.fillRect(x+23, y+7, 3,3); }
         }
-
-        // Popups Update
-        for (let i = popups.length - 1; i >= 0; i--) {
-            let pop = popups[i];
-            pop.y += pop.vy;
-            pop.life--;
-            if (pop.life <= 0) popups.splice(i, 1);
-        }
-
-        if (screenShake > 0) screenShake--;
     }
 
     function draw() {
-        let camX = WIDTH / 2 - player.x - PLAYER_SIZE / 2;
-        let camY = HEIGHT / 2 - player.y - PLAYER_SIZE / 2;
+        let camX = Math.floor(WIDTH/2 - player.x - 20), camY = Math.floor(HEIGHT/2 - player.y - 20);
 
-        if (screenShake > 0) {
-            camX += (Math.random() - 0.5) * 8;
-            camY += (Math.random() - 0.5) * 8;
-        }
+        ctx.fillStyle = grassPattern || '#3b5e2b'; ctx.save();
+        ctx.translate(camX % 64, camY % 64); ctx.fillRect(-64, -64, WIDTH+128, HEIGHT+128); ctx.restore();
 
-        ctx.fillStyle = grassPattern || '#3b5e2b';
-        ctx.save(); 
-        ctx.translate(camX % 64, camY % 64); 
-        ctx.fillRect(-64, -64, WIDTH + 128, HEIGHT + 128);
-        ctx.restore();
+        ctx.save(); ctx.translate(camX, camY);
 
-        ctx.save();
-        ctx.translate(camX, camY);
+        // Ponds
+        ponds.forEach(p => {
+            if (Math.abs(p.x - player.x) > WIDTH || Math.abs(p.y - player.y) > HEIGHT) return;
+            ctx.fillStyle = '#2c4c1e'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r+6, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#2980b9'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(p.x-8, p.y-8, p.r*0.5, 0, Math.PI*2); ctx.fill();
+        });
 
-        // Render Ponds
-        for (let i = 0; i < ponds.length; i++) {
-            let p = ponds[i];
-            if (p.x > player.x - WIDTH/2 - 100 && p.x < player.x + WIDTH/2 + 100 && p.y > player.y - HEIGHT/2 - 100 && p.y < player.y + HEIGHT/2 + 100) {
-                ctx.fillStyle = '#2c4c1e';
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = '#2980b9';
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = '#3498db';
-                ctx.beginPath();
-                ctx.arc(p.x - 8, p.y - 8, p.r * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        // Merchant Structure
-        ctx.fillStyle = '#781d1d';
-        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 60);
-        ctx.fillStyle = '#f1c40f'; 
-        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 4);
-        ctx.fillRect(merchant.x - 20, merchant.y + 46, 80, 4);
-
-        ctx.fillStyle = '#4a2e16';
-        ctx.fillRect(merchant.x + 8, merchant.y + 8, 24, 26);
-        ctx.fillStyle = '#f5c6a5';
-        ctx.fillRect(merchant.x + 12, merchant.y - 2, 16, 12);
-        ctx.fillStyle = '#ecf0f1';
-        ctx.fillRect(merchant.x + 10, merchant.y + 8, 20, 16);
-        ctx.fillStyle = '#2c3e50';
-        ctx.fillRect(merchant.x + 8, merchant.y - 8, 24, 8);
-        ctx.fillStyle = 'black';
-        ctx.fillRect(merchant.x + 14, merchant.y + 2, 3, 3);
-        ctx.fillRect(merchant.x + 23, merchant.y + 2, 3, 3);
-
-        // Crafting Table Structure
-        ctx.fillStyle = '#5c3a21';
-        ctx.fillRect(craftingTable.x - 10, craftingTable.y - 5, 60, 50);
-        ctx.fillStyle = '#2ecc71';
-        ctx.fillRect(craftingTable.x - 12, craftingTable.y - 8, 64, 12);
-        ctx.fillStyle = '#f1c40f';
-        ctx.fillRect(craftingTable.x + 16, craftingTable.y + 15, 8, 16);
-        ctx.fillRect(craftingTable.x + 10, craftingTable.y + 12, 20, 8);
+        // Merchant
+        ctx.fillStyle='#781d1d'; ctx.fillRect(merchant.x-20, merchant.y-10, 80, 60);
+        ctx.fillStyle='#f1c40f'; ctx.fillRect(merchant.x-20, merchant.y-10, 80, 4); ctx.fillRect(merchant.x-20, merchant.y+46, 80, 4);
+        drawModel(merchant.x-4, merchant.y-10, 'down'); 
+        
+        // Crafting
+        ctx.fillStyle='#5c3a21'; ctx.fillRect(craftingTable.x-10, craftingTable.y-5, 60, 50);
+        ctx.fillStyle='#2ecc71'; ctx.fillRect(craftingTable.x-12, craftingTable.y-8, 64, 12);
 
         let time = Date.now();
-        let nearbyTrees = getNearbyTrees();
-        let nearbyPond = getNearbyPond();
+        
+        // Trees
+        trees.forEach(t => {
+            if (Math.abs(t.x - player.x) > WIDTH || Math.abs(t.y - player.y) > HEIGHT) return;
+            let sway = Math.sin(time/350 + t.x) * 4;
+            let tData = TREE_TYPES[t.type] || TREE_TYPES.oak;
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(t.x+40, t.y+75, 32, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = tData.trunk; ctx.fillRect(t.x+28, t.y+35, 24, 45);
+            let leaf = t.type === 'majestic' ? `hsl(${Math.floor((time/10+t.x)%360)}, 85%, 55%)` : tData.color;
+            ctx.fillStyle = leaf;
 
-        // Render Trees
-        for (let i = 0; i < trees.length; i++) {
-            let t = trees[i];
-            if (t.x > player.x - WIDTH/2 - 100 && t.x < player.x + WIDTH/2 + 100 && t.y > player.y - HEIGHT/2 - 100 && t.y < player.y + HEIGHT/2 + 100) {
-                let sway = Math.sin((time / 350) + t.x) * 4; 
-                let tData = TREE_TYPES[t.type] || TREE_TYPES['oak'];
-                
-                ctx.fillStyle = 'rgba(0,0,0,0.25)';
-                ctx.beginPath();
-                ctx.arc(t.x + TREE_SIZE/2, t.y + TREE_SIZE - 5, 32, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = tData.trunk; 
-                ctx.fillRect(t.x + 28, t.y + 35, 24, 45);
-                if (t.type === 'birch') {
-                    ctx.fillStyle = '#333333';
-                    ctx.fillRect(t.x + 30, t.y + 45, 8, 3);
-                    ctx.fillRect(t.x + 38, t.y + 58, 8, 3);
-                    ctx.fillRect(t.x + 32, t.y + 68, 8, 3);
-                }
-
-                let leafColor = tData.color;
-                if (t.type === 'majestic') {
-                    let hue = Math.floor((time / 10 + t.x) % 360);
-                    leafColor = 'hsl(' + hue + ', 85%, 55%)';
-                }
-
-                ctx.fillStyle = leafColor;
-                if (t.type === 'pine') {
-                    ctx.beginPath();
-                    ctx.moveTo(t.x + 40 + sway, t.y - 15);
-                    ctx.lineTo(t.x + 5, t.y + 30);
-                    ctx.lineTo(t.x + 75, t.y + 30);
-                    ctx.fill();
-
-                    ctx.beginPath();
-                    ctx.moveTo(t.x + 40 + sway, t.y + 10);
-                    ctx.lineTo(t.x + 10, t.y + 50);
-                    ctx.lineTo(t.x + 70, t.y + 50);
-                    ctx.fill();
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(t.x + 40 + sway, t.y + 10, 38, 0, Math.PI * 2); 
-                    ctx.arc(t.x + 15 + sway, t.y + 30, 30, 0, Math.PI * 2); 
-                    ctx.arc(t.x + 65 + sway, t.y + 30, 30, 0, Math.PI * 2); 
-                    ctx.fill();
-
-                    ctx.fillStyle = (t.type === 'majestic') ? 'hsl(' + Math.floor(((time / 10) + 180) % 360) + ', 90%, 70%)' : 'rgba(255,255,255,0.2)';
-                    ctx.beginPath();
-                    ctx.arc(t.x + 35 + sway, t.y + 5, 24, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                if (nearbyTrees.includes(t) && !player.choppingTarget) {
-                    ctx.save();
-                    ctx.fillStyle = 'rgba(0,0,0,0.85)';
-                    ctx.fillRect(t.x - 15, t.y - 35, 110, 26);
-                    ctx.strokeStyle = (t.type === 'majestic') ? leafColor : '#daa520';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(t.x - 15, t.y - 35, 110, 26);
-
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 11px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(`${tData.name} [SPACE]`, t.x + 40, t.y - 18);
-                    ctx.restore();
-                }
+            if (t.type === 'pine') {
+                ctx.beginPath(); ctx.moveTo(t.x+40+sway, t.y-15); ctx.lineTo(t.x+5, t.y+30); ctx.lineTo(t.x+75, t.y+30); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(t.x+40+sway, t.y+10); ctx.lineTo(t.x+10, t.y+50); ctx.lineTo(t.x+70, t.y+50); ctx.fill();
+            } else {
+                ctx.beginPath(); ctx.arc(t.x+40+sway, t.y+10, 38, 0, Math.PI*2); ctx.arc(t.x+15+sway, t.y+30, 30, 0, Math.PI*2); ctx.arc(t.x+65+sway, t.y+30, 30, 0, Math.PI*2); ctx.fill();
             }
+        });
+
+        // Other Players (Multiplayer)
+        for(let id in otherPlayers) {
+            let op = otherPlayers[id];
+            if(time - op.lastSeen > 10000) { delete otherPlayers[id]; continue; }
+            drawModel(op.x, op.y, op.facing);
+            ctx.fillStyle = '#f1c40f'; ctx.font = '10px Arial'; ctx.textAlign='center';
+            ctx.fillText(id, op.x+20, op.y-5);
         }
 
-        // Pond Prompt
-        if (nearbyPond && nearbyTrees.length === 0 && !player.fishingTarget) {
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.85)';
-            ctx.fillRect(nearbyPond.x - 45, nearbyPond.y - 20, 90, 26);
-            ctx.strokeStyle = '#3498db';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(nearbyPond.x - 45, nearbyPond.y - 20, 90, 26);
+        // Self
+        drawModel(player.x, player.y, player.facing);
+        ctx.fillStyle = '#2ecc71'; ctx.font = '10px Arial'; ctx.textAlign='center'; ctx.fillText(myId, player.x+20, player.y-5);
 
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 11px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Fish [SPACE]`, nearbyPond.x, nearbyPond.y - 3);
-            ctx.restore();
-        }
-
-        // Particles
-        for (let i = 0; i < particles.length; i++) {
-            let p = particles[i];
-            ctx.fillStyle = p.color;
-            ctx.fillRect(p.x, p.y, 4, 4);
-        }
-
-        // Popups
-        for (let i = 0; i < popups.length; i++) {
-            let pop = popups[i];
-            ctx.save();
-            ctx.fillStyle = pop.color;
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(pop.text, pop.x + PLAYER_SIZE/2, pop.y);
-            ctx.restore();
-        }
-
-        // Player Model
-        let px = player.x;
-        let py = player.y;
-
-        ctx.fillStyle = '#1b365d';
-        ctx.fillRect(px + 10, py + 30, 8, 10);
-        ctx.fillRect(px + 22, py + 30, 8, 10);
-
-        ctx.fillStyle = '#b02323';
-        ctx.fillRect(px + 8, py + 16, 24, 14);
-        ctx.fillStyle = '#6b1111';
-        ctx.fillRect(px + 12, py + 16, 4, 14);
-        ctx.fillRect(px + 20, py + 16, 4, 14);
-        ctx.fillRect(px + 8, py + 20, 24, 4);
-
-        ctx.fillStyle = '#f5c6a5';
-        ctx.fillRect(px + 12, py + 2, 16, 14);
-        ctx.fillStyle = '#3a2212';
-        if (player.facing === 'up') { 
-            ctx.fillRect(px + 12, py + 2, 16, 14); 
-        } else {
-            ctx.fillRect(px + 12, py + 2, 16, 4); 
-            if (player.facing === 'down') {
-                ctx.fillRect(px + 12, py + 12, 16, 4); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 15, py + 7, 3, 3); 
-                ctx.fillRect(px + 22, py + 7, 3, 3);
-            } else if (player.facing === 'left') {
-                ctx.fillRect(px + 12, py + 8, 6, 8); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 14, py + 7, 3, 3); 
-            } else if (player.facing === 'right') {
-                ctx.fillRect(px + 22, py + 8, 6, 8); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 23, py + 7, 3, 3); 
-            }
-        }
-
-        // Held Tool Visuals
+        // Tool visuals
         if (player.fishingTarget) {
-            ctx.strokeStyle = '#d2b48c';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(px + 20, py + 20);
-            ctx.lineTo(player.fishingTarget.x, player.fishingTarget.y);
-            ctx.stroke();
+            ctx.strokeStyle = '#d2b48c'; ctx.lineWidth = 3; ctx.beginPath();
+            ctx.moveTo(player.x+20, player.y+20); ctx.lineTo(player.fishingTarget.x, player.fishingTarget.y); ctx.stroke();
         } else {
-            if (player.facing === 'right' || player.facing === 'down') {
-                ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 28, py + 18, 4, 16);
-                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 30, py + 16, 8, 8);
-            } else if (player.facing === 'left' || player.facing === 'up') {
-                ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 8, py + 18, 4, 16);
-                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 2, py + 16, 8, 8);
-            }
+            let ox = (player.facing === 'right' || player.facing === 'down') ? 28 : 2;
+            ctx.fillStyle = '#5c4033'; ctx.fillRect(player.x+ox, player.y+18, 4, 16);
+            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(player.x+ox-2, player.y+16, 8, 8);
         }
 
-        // Progress Bar
+        // Progress Bars
         if (player.choppingTarget || player.fishingTarget) {
-            let req = player.choppingTarget ? (BASE_CHOP_TIME / player.axe_damage) : (BASE_FISH_TIME / player.rod_level);
+            let req = player.choppingTarget ? (10000 / player.axe_damage) : (6000 / player.rod_level);
             let prog = player.choppingTarget ? player.chopProgress : player.fishProgress;
-            let ratio = Math.min(1, prog / req);
-            let barColor = player.choppingTarget ? '#2ecc71' : '#3498db';
-
-            ctx.fillStyle = 'rgba(0,0,0,0.8)';
-            ctx.fillRect(px - 10, py - 18, 60, 10);
-            ctx.fillStyle = barColor;
-            ctx.fillRect(px - 8, py - 16, 56 * ratio, 6);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px - 10, py - 18, 60, 10);
+            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x-10, player.y-18, 60, 10);
+            ctx.fillStyle = player.choppingTarget ? '#2ecc71' : '#3498db';
+            ctx.fillRect(player.x-8, player.y-16, 56 * Math.min(1, prog/req), 6);
         }
 
-        ctx.restore(); 
+        particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4); });
+        popups.forEach(p => { ctx.fillStyle = p.color; ctx.font = 'bold 14px Arial'; ctx.textAlign='center'; ctx.fillText(p.text, p.x+20, p.y); });
+        
+        ctx.restore();
 
-        // HUD Inventory Panel
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.fillRect(10, 10, 240, 250);
-        ctx.strokeStyle = '#daa520';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(10, 10, 240, 250);
+        // UI
+        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, 240, 250);
+        ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10, 240, 250);
+        ctx.textAlign = 'left';
+        
+        ctx.fillStyle = '#daa520'; ctx.font = 'bold 14px Arial'; ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 30);
+        ctx.fillStyle = '#e67e22'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- TIMBER ---`, 20, 50);
+        ctx.fillStyle = '#fff'; ctx.font = '11px Arial';
+        ctx.fillText(`🪵 Oak: ${player.inventory.oak||0} | 🤍 Birch: ${player.inventory.birch||0}`, 20, 68);
+        ctx.fillText(`🌲 Pine: ${player.inventory.pine||0} | ⭐ Golden: ${player.inventory.golden||0}`, 20, 84);
+        ctx.fillStyle = `hsl(${Math.floor((time/10)%360)}, 100%, 70%)`; ctx.fillText(`🌈 Majestic: ${player.inventory.majestic||0}`, 20, 100);
 
-        ctx.fillStyle = '#daa520';
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 30);
+        ctx.fillStyle = '#3498db'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- FISHING TREASURES ---`, 20, 122);
+        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial'; ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed||0}`, 20, 140);
+        ctx.fillStyle = '#3498db'; ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales||0}`, 20, 156);
+        ctx.fillStyle = '#95a5a6'; ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth||0}`, 20, 172);
+        ctx.fillStyle = '#9b59b6'; ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail||0}`, 20, 188);
+        ctx.fillStyle = '#f1c40f'; ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold||0}`, 20, 204);
 
-        ctx.fillStyle = '#e67e22';
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText(`--- TIMBER ---`, 20, 50);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '11px Arial';
-        ctx.fillText(`🪵 Oak: ${player.inventory.oak || 0} | 🤍 Birch: ${player.inventory.birch || 0}`, 20, 68);
-        ctx.fillText(`🌲 Pine: ${player.inventory.pine || 0} | ⭐ Golden: ${player.inventory.golden || 0}`, 20, 84);
-        ctx.fillStyle = 'hsl(' + Math.floor((time/10)%360) + ', 100%, 70%)';
-        ctx.fillText(`🌈 Majestic: ${player.inventory.majestic || 0}`, 20, 100);
-
-        ctx.fillStyle = '#3498db';
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText(`--- FISHING TREASURES ---`, 20, 122);
-        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial';
-        ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed || 0}`, 20, 140);
-        ctx.fillStyle = '#3498db';
-        ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales || 0}`, 20, 156);
-        ctx.fillStyle = '#95a5a6';
-        ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth || 0}`, 20, 172);
-        ctx.fillStyle = '#9b59b6';
-        ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail || 0}`, 20, 188);
-        ctx.fillStyle = '#f1c40f';
-        ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold || 0}`, 20, 204);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '11px Arial';
-        ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
-        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🍀 Luck: +${(player.rod_luck * 100).toFixed(0)}%`, 20, 246);
-
-        // Merchant / Crafting Distance Prompts
-        let mDist = Math.sqrt(Math.pow((merchant.x+20) - (player.x+20), 2) + Math.pow((merchant.y+20) - (player.y+20), 2));
-        let cDist = Math.sqrt(Math.pow((craftingTable.x+20) - (player.x+20), 2) + Math.pow((craftingTable.y+20) - (player.y+20), 2));
-
-        if (mDist < 80) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Press [E] for Merchant Shop`, WIDTH / 2, HEIGHT - 40);
-            ctx.textAlign = 'left';
-        } else if (cDist < 80) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Press [E] for Crafting Table`, WIDTH / 2, HEIGHT - 40);
-            ctx.textAlign = 'left';
-        }
+        ctx.fillStyle = '#fff'; ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
+        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🌲 Tree Luck: +${(player.axe_luck*100).toFixed(0)}% Yield`, 20, 246);
     }
 
     let lastTime = Date.now();
     function gameLoop() {
-        try {
-            let now = Date.now();
-            let dt = now - lastTime;
-            lastTime = now;
-
-            update(dt);
-            draw();
-        } catch (e) {
-            console.error("Game loop error:", e);
-        }
         requestAnimationFrame(gameLoop);
+        let now = Date.now(); let dt = now - lastTime; lastTime = now;
+        try { update(dt); draw(); } catch(e) {}
     }
-
     gameLoop();
 });
 </script>
