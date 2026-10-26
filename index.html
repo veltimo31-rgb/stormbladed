@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Cheatcode & Avatar Edition</title>
+<title>Stormblade - Gandalf Transformation & City Travel</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -36,13 +36,14 @@
   .modal-shop { 
     display: none; position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%); background: #222; 
-    border: 3px solid #daa520; padding: 20px; width: 480px; 
-    max-width: 90vw; text-align: center; color: white; 
+    border: 3px solid #daa520; padding: 20px; width: 500px; 
+    max-width: 92vw; text-align: center; color: white; 
     border-radius: 8px; box-shadow: 0 0 25px rgba(0,0,0,0.9); z-index: 10;
     max-height: 85vh; overflow-y: auto;
   }
   .shop-btn { 
-    display: block; margin: 8px auto; padding: 10px; 
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 8px auto; padding: 10px; 
     background: #333; color: #daa520; border: 1px solid #daa520; 
     cursor: pointer; width: 95%; font-size: 13px; font-weight: bold;
     border-radius: 4px; transition: 0.2s;
@@ -50,8 +51,8 @@
   .shop-btn:hover { background: #daa520; color: #111; }
   .craft-btn { color: #2ecc71; border-color: #2ecc71; }
   .craft-btn:hover { background: #2ecc71; color: #111; }
-  .avatar-btn { color: #e74c3c; border-color: #e74c3c; }
-  .avatar-btn:hover { background: #e74c3c; color: #fff; }
+  .iga-btn { color: #e74c3c; border-color: #e74c3c; }
+  .iga-btn:hover { background: #e74c3c; color: #fff; }
   .admin-btn { color: #9b59b6; border-color: #9b59b6; }
   .admin-btn:hover { background: #9b59b6; color: #fff; }
 
@@ -87,12 +88,24 @@
     border: 1px solid #777; border-radius: 4px; outline: none; font-size: 14px;
   }
   #chat-input:focus { border-color: #3498db; background: rgba(0,0,0,0.9); }
+
+  /* Flight Transition Overlay */
+  #flight-overlay {
+    display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: #111; z-index: 30; flex-direction: column; justify-content: center;
+    align-items: center; color: #f1c40f; font-size: 24px; font-weight: bold;
+  }
 </style>
 </head>
 <body>
 
 <div id="game-container">
   <canvas id="gameCanvas"></canvas>
+
+  <div id="flight-overlay">
+    <div style="font-size: 50px; margin-bottom: 20px;">✈️</div>
+    <div id="flight-text">FLYING TO CITY SQUARE...</div>
+  </div>
 
   <!-- Initial Name Selection Window -->
   <div id="name-modal">
@@ -117,45 +130,59 @@
     <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
   </div>
   
+  <!-- MERCHANT SHOP -->
   <div id="shop" class="modal-shop">
-    <h2 style="color: #daa520; margin-bottom: 6px;">Merchant & Outfit Shop</h2>
-    <button class="shop-btn" id="btn-sell">Sell All Timber Inventory [1]</button>
-    <button class="shop-btn" id="btn-upgrade">Upgrade Axe Damage [2]</button>
-    <hr style="border-color:#444; margin:10px 0;">
-    <h4 style="color: #e74c3c; margin-bottom: 6px;">Avatar Colors (100 Plat)</h4>
-    <button class="shop-btn avatar-btn" id="buy-color-ruby">Equip Ruby Outfit</button>
-    <button class="shop-btn avatar-btn" id="buy-color-cobalt">Equip Cobalt Outfit</button>
-    <button class="shop-btn avatar-btn" id="buy-color-emerald">Equip Emerald Outfit</button>
-    <button class="shop-btn avatar-btn" id="buy-color-obsidian">Equip Obsidian Outfit</button>
-    <button class="shop-btn avatar-btn" id="buy-color-gold" style="border-color:#f1c40f; color:#f1c40f;">Equip Pure Gold (250 Plat)</button>
-    <hr style="border-color:#444; margin:10px 0;">
-    <h4 style="color: #9b59b6; margin-bottom: 6px;">Hats & Accessories (150 Plat)</h4>
-    <button class="shop-btn avatar-btn" id="buy-hat-headband">Equip Hero Headband</button>
-    <button class="shop-btn avatar-btn" id="buy-hat-wizard">Equip Wizard Hat</button>
-    <button class="shop-btn avatar-btn" id="buy-hat-crown" style="border-color:#f1c40f; color:#f1c40f;">Equip King Crown (300 Plat)</button>
-    <button class="shop-btn" id="btn-exit" style="margin-top:10px;">Exit Shop [E]</button>
+    <h2 style="color: #daa520; margin-bottom: 6px;">🏛️ City Grand Merchant</h2>
+    <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Sell harvested materials and upgrade tools.</p>
+    <button class="shop-btn" id="btn-sell"><span>🪵</span> <span>Sell All Timber Inventory [1]</span></button>
+    <button class="shop-btn" id="btn-upgrade"><span>🪓</span> <span id="lbl-axe-up">Upgrade Axe Damage (50 Plat) [2]</span></button>
+    <button class="shop-btn" id="btn-exit" style="margin-top:12px;"><span>❌</span> <span>Exit Merchant [E]</span></button>
   </div>
 
+  <!-- FISHER MARKET (Replaces Crafting Table in City) -->
   <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
-    <h2 style="color: #2ecc71; margin-bottom: 6px;">Crafting Table</h2>
-    <button class="shop-btn craft-btn" id="craft-rod">Upgrade Rod Speed [1]</button>
-    <button class="shop-btn craft-btn" id="craft-speed">Swift Boots +Speed [2]</button>
-    <button class="shop-btn craft-btn" id="craft-luck">Shark Luck Charm +Tree Luck [3]</button>
-    <button class="shop-btn craft-btn" id="craft-hitbox">Dolphin Ring +Multi-Chop [4]</button>
-    <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;">Timmah's Blessing +ALL STATS [5]</button>
-    <button class="shop-btn" id="craft-exit" style="margin-top:8px;">Exit Crafting [E]</button>
+    <h2 style="color: #2ecc71; margin-bottom: 6px;">🐟 Fisher Market</h2>
+    <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Trade ocean treasures for permanent stat upgrades.</p>
+    <button class="shop-btn craft-btn" id="craft-rod"><span>🎣</span> <span id="lbl-rod">Upgrade Rod Speed [1]</span></button>
+    <button class="shop-btn craft-btn" id="craft-speed"><span>👟</span> <span id="lbl-speed">Swift Boots +Speed [2]</span></button>
+    <button class="shop-btn craft-btn" id="craft-luck"><span>🦈</span> <span id="lbl-luck">Shark Luck Charm +Tree Luck [3]</span></button>
+    <button class="shop-btn craft-btn" id="craft-hitbox"><span>🐬</span> <span id="lbl-multi">Dolphin Ring +Multi-Chop [4]</span></button>
+    <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;"><span>👑</span> <span id="lbl-timmah">Timmah's Blessing +ALL STATS [5]</span></button>
+    <button class="shop-btn" id="craft-exit" style="margin-top:8px;"><span>❌</span> <span>Exit Market [E]</span></button>
+  </div>
+
+  <!-- IGA SUPERMARKET -->
+  <div id="iga-shop" class="modal-shop" style="border-color: #e74c3c;">
+    <h2 style="color: #e74c3c; margin-bottom: 4px;">🏪 IGA Supermarket & Styles</h2>
+    <p style="font-size: 12px; color: #aaa; margin-bottom: 12px;">Customise your identity & buy cosmetic dyes!</p>
+
+    <button class="shop-btn iga-btn" id="iga-rename"><span>✏️</span> <span>Change Username</span></button>
+    <hr style="border-color:#444; margin:10px 0;">
+    <h4 style="color: #f39c12; margin-bottom: 6px;">Outfit Dyes (100 Plat)</h4>
+    <button class="shop-btn iga-btn" id="buy-color-ruby"><span>🔴</span> <span>Equip Ruby Outfit</span></button>
+    <button class="shop-btn iga-btn" id="buy-color-cobalt"><span>🔵</span> <span>Equip Cobalt Outfit</span></button>
+    <button class="shop-btn iga-btn" id="buy-color-emerald"><span>🟢</span> <span>Equip Emerald Outfit</span></button>
+    <button class="shop-btn iga-btn" id="buy-color-obsidian"><span>⚫</span> <span>Equip Obsidian Outfit</span></button>
+    <button class="shop-btn iga-btn" id="buy-color-gold" style="border-color:#f1c40f; color:#f1c40f;"><span>🟡</span> <span>Equip Pure Gold (250 Plat)</span></button>
+    <hr style="border-color:#444; margin:10px 0;">
+    <h4 style="color: #9b59b6; margin-bottom: 6px;">Hats & Accessories (150 Plat)</h4>
+    <button class="shop-btn iga-btn" id="buy-hat-headband"><span>🎀</span> <span>Equip Hero Headband</span></button>
+    <button class="shop-btn iga-btn" id="buy-hat-wizard"><span>🧙‍♂️</span> <span>Equip Wizard Hat</span></button>
+    <button class="shop-btn iga-btn" id="buy-hat-crown" style="border-color:#f1c40f; color:#f1c40f;"><span>👑</span> <span>Equip King Crown (300 Plat)</span></button>
+    <button class="shop-btn" id="iga-exit" style="margin-top:10px;"><span>❌</span> <span>Exit IGA Store [E]</span></button>
   </div>
 
   <!-- SECRET CHEAT / ADMIN PANEL -->
   <div id="admin-panel" class="modal-shop" style="border-color: #9b59b6;">
     <h2 style="color: #9b59b6; margin-bottom: 4px;">🧙‍♂️ Gandalf's Admin Panel</h2>
     <p style="font-size: 11px; color:#aaa; margin-bottom:12px;">Cheat Code Activated!</p>
-    <button class="shop-btn admin-btn" id="adm-plat">+1,000 Platinum</button>
-    <button class="shop-btn admin-btn" id="adm-wood">+100 All Timber Types</button>
-    <button class="shop-btn admin-btn" id="adm-fish">+50 All Fishing Treasures</button>
-    <button class="shop-btn admin-btn" id="adm-stats">Max Speed & Axe Luck</button>
-    <button class="shop-btn admin-btn" id="adm-outfits">Unlock All Outfits & Hats</button>
-    <button class="shop-btn" id="adm-exit" style="margin-top:10px;">Close Panel [E]</button>
+    <button class="shop-btn admin-btn" id="adm-plat"><span>💎</span> <span>+1,000 Platinum</span></button>
+    <button class="shop-btn admin-btn" id="adm-wood"><span>🪵</span> <span>+100 All Timber Types</span></button>
+    <button class="shop-btn admin-btn" id="adm-fish"><span>🐟</span> <span>+50 All Treasures</span></button>
+    <button class="shop-btn admin-btn" id="adm-stats"><span>⚡</span> <span>Max Speed & Axe Luck</span></button>
+    <button class="shop-btn admin-btn" id="adm-outfits"><span>🎨</span> <span>Unlock All Outfits & Hats</span></button>
+    <button class="shop-btn admin-btn" id="adm-gandalf"><span>🧙‍♂️</span> <span>Toggle 3x Gandalf Mode</span></button>
+    <button class="shop-btn" id="adm-exit" style="margin-top:10px;"><span>❌</span> <span>Close Panel [E]</span></button>
   </div>
 </div>
 
@@ -166,9 +193,12 @@ window.addEventListener('load', function() {
     const ctx = canvas.getContext('2d');
     const shopDiv = document.getElementById('shop');
     const craftDiv = document.getElementById('crafting');
+    const igaDiv = document.getElementById('iga-shop');
     const adminDiv = document.getElementById('admin-panel');
     const nameModal = document.getElementById('name-modal');
     const usernameInput = document.getElementById('username-input');
+    const flightOverlay = document.getElementById('flight-overlay');
+    const flightText = document.getElementById('flight-text');
 
     let WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
     window.addEventListener('resize', () => {
@@ -179,6 +209,7 @@ window.addEventListener('load', function() {
 
     const TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
     let inMenu = false, menuType = null, keys = {};
+    let currentMap = 'forest';
 
     const TREE_TYPES = {
         oak: { name: "Oak", color: "#274e13", trunk: "#4a2e16", val: 5, weight: 55 },
@@ -213,49 +244,60 @@ window.addEventListener('load', function() {
         axe_level: 1, axe_damage: 1, axe_range: 85, axe_multi: false, axe_luck: 0,
         rod_level: 1, facing: 'down',
         bodyColor: '#b02323', hat: 'none', unlockedOutfits: ['#b02323'], unlockedHats: ['none'],
+        isGandalf: false, scale: 1.0,
         choppingTarget: null, chopProgress: 0, fishingTarget: null, fishProgress: 0
     };
 
     let trees = [], ponds = [], particles = [], popups = [], chunksGenerated = {}, respawnQueue = [];
-    const merchant = { x: 120, y: -80 }, craftingTable = { x: 240, y: -80 };
+    
+    const forestPlane = { x: 0, y: 180 };
+    const cityPlane = { x: 0, y: 180 };
+    const forestMerchant = { x: 120, y: -80 }, forestCrafting = { x: 240, y: -80 };
+    const cityMerchant = { x: -160, y: -100 }, cityFisherMarket = { x: 160, y: -100 }, cityIGA = { x: 0, y: -180 };
 
-    // --- 80s RETRO CHEAT CODE LISTENER ("gandalfthewhite") ---
+    // --- CHEAT CODE LISTENER ("gandalfthewhite") ---
     const cheatCode = "gandalfthewhite";
     let cheatBuffer = "";
 
+    function triggerGandalfMode() {
+        player.isGandalf = true;
+        player.scale = 3.0;
+        player.speed = Math.max(player.speed, 8.0);
+        player.axe_damage = Math.max(player.axe_damage, 10);
+        player.axe_range = Math.max(player.axe_range, 160);
+        player.axe_multi = true;
+        player.platinum += 1000;
+        inMenu = true; menuType = 'admin'; adminDiv.style.display = 'block';
+        spawnPopUp("🧙‍♂️ YOU SHALL NOT PASS! (3x GANDALF ACTIVATED)", "#ffffff", player.x, player.y - 65);
+        broadcastPosition();
+        saveGame();
+    }
+
     window.addEventListener('keydown', function(e) {
         if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput) return;
-        
         let char = e.key.toLowerCase();
         if (char.length === 1 && char >= 'a' && char <= 'z') {
             cheatBuffer += char;
-            if (cheatBuffer.length > cheatCode.length) {
-                cheatBuffer = cheatBuffer.substring(cheatBuffer.length - cheatCode.length);
-            }
+            if (cheatBuffer.length > cheatCode.length) cheatBuffer = cheatBuffer.substring(cheatBuffer.length - cheatCode.length);
             if (cheatBuffer === cheatCode) {
                 cheatBuffer = "";
-                inMenu = true; menuType = 'admin'; adminDiv.style.display = 'block';
-                spawnPopUp("✨ YOU SHALL NOT PASS! (Admin Unlocked)", "#9b59b6", player.x, player.y - 45);
+                triggerGandalfMode();
             }
         }
     });
 
-    // --- USERNAME CONTROLS ---
+    // USERNAME MODAL
     document.getElementById('btn-save-name').onclick = function() {
         let val = usernameInput.value.trim();
         if (val !== "") player.name = val;
-        nameModal.style.display = 'none';
-        saveGame();
+        nameModal.style.display = 'none'; saveGame();
     };
     document.getElementById('btn-name-edit').onclick = function() {
-        usernameInput.value = player.name;
-        nameModal.style.display = 'flex';
+        usernameInput.value = player.name; nameModal.style.display = 'flex';
     };
 
-    // --- PEERJS ROOM CODE SYSTEM ---
-    let peer = null;
-    let peerConnections = [];
-    let otherPlayers = {};
+    // PEERJS MULTIPLAYER
+    let peer = null, peerConnections = [], otherPlayers = {};
     const roomStatus = document.getElementById('room-status');
 
     function addChatMessage(sender, text) {
@@ -264,9 +306,10 @@ window.addEventListener('load', function() {
         el.className = 'chat-msg';
         let color = sender === player.name ? '#f1c40f' : (sender === 'System' ? '#2ecc71' : '#3498db');
         el.innerHTML = `<strong style="color:${color}">${sender}:</strong> ${text}`;
-        box.appendChild(el);
-        box.scrollTop = box.scrollHeight;
+        box.appendChild(el); box.scrollTop = box.scrollHeight;
     }
+
+    addChatMessage("System", "Type 'gandalfthewhite' anywhere to transform into 3x Gandalf!");
 
     function setupDataConnection(conn) {
         peerConnections.push(conn);
@@ -274,12 +317,12 @@ window.addEventListener('load', function() {
             if (data.type === 'move') {
                 otherPlayers[data.id] = { 
                     name: data.name, x: data.x, y: data.y, facing: data.facing, 
-                    bodyColor: data.bodyColor, hat: data.hat, lastSeen: Date.now() 
+                    bodyColor: data.bodyColor, hat: data.hat, isGandalf: data.isGandalf, scale: data.scale || 1.0, map: data.map, lastSeen: Date.now() 
                 };
             } else if (data.type === 'chat') {
                 addChatMessage(data.name, data.text);
-                if (otherPlayers[data.id]) {
-                    spawnPopUp(data.text, "#ffffff", otherPlayers[data.id].x, otherPlayers[data.id].y - 35);
+                if (otherPlayers[data.id] && otherPlayers[data.id].map === currentMap) {
+                    spawnPopUp(data.text, "#ffffff", otherPlayers[data.id].x, otherPlayers[data.id].y - (otherPlayers[data.id].isGandalf ? 95 : 35));
                 }
             }
         });
@@ -291,7 +334,7 @@ window.addEventListener('load', function() {
         peer = new Peer("sb-room-" + code);
         peer.on('open', () => {
             roomStatus.innerText = "ROOM CODE: " + code;
-            addChatMessage("System", "Room active! Give your friend code: " + code);
+            addChatMessage("System", "Room active! Give code: " + code);
             spawnPopUp("Room Code: " + code, "#f1c40f", player.x, player.y - 45);
         });
         peer.on('connection', (conn) => { setupDataConnection(conn); addChatMessage("System", "Friend connected!"); });
@@ -305,8 +348,7 @@ window.addEventListener('load', function() {
         peer.on('open', () => {
             let conn = peer.connect("sb-room-" + code);
             conn.on('open', () => {
-                setupDataConnection(conn);
-                roomStatus.innerText = "CONNECTED!";
+                setupDataConnection(conn); roomStatus.innerText = "CONNECTED!";
                 addChatMessage("System", "Joined Room " + code);
                 spawnPopUp("Connected to Host!", "#2ecc71", player.x, player.y - 45);
             });
@@ -321,7 +363,7 @@ window.addEventListener('load', function() {
             let packet = { 
                 type: 'move', id: peer.id, name: player.name, 
                 x: Math.round(player.x), y: Math.round(player.y), facing: player.facing,
-                bodyColor: player.bodyColor, hat: player.hat
+                bodyColor: player.bodyColor, hat: player.hat, isGandalf: player.isGandalf, scale: player.scale, map: currentMap
             };
             peerConnections.forEach(c => { if(c.open) c.send(packet); });
             lastSendTime = now;
@@ -340,7 +382,7 @@ window.addEventListener('load', function() {
                     peerConnections.forEach(c => { if(c.open) c.send(packet); });
                 }
                 addChatMessage(player.name, txt);
-                spawnPopUp(txt, "#ffffff", player.x, player.y - 35);
+                spawnPopUp(txt, "#ffffff", player.x, player.y - (player.isGandalf ? 95 : 35));
             }
             chatInput.value = ''; chatInput.blur();
         }
@@ -354,9 +396,10 @@ window.addEventListener('load', function() {
                 inventory: player.inventory, fishLoot: player.fishLoot,
                 axe_level: player.axe_level, axe_damage: player.axe_damage, axe_range: player.axe_range,
                 axe_multi: player.axe_multi, axe_luck: player.axe_luck, rod_level: player.rod_level,
-                bodyColor: player.bodyColor, hat: player.hat, unlockedOutfits: player.unlockedOutfits, unlockedHats: player.unlockedHats
+                bodyColor: player.bodyColor, hat: player.hat, unlockedOutfits: player.unlockedOutfits, unlockedHats: player.unlockedHats,
+                isGandalf: player.isGandalf, scale: player.scale
             }));
-            spawnPopUp("💾 Game Saved!", "#f1c40f", player.x, player.y - 45);
+            spawnPopUp("💾 Game Saved!", "#f1c40f", player.x, player.y - (player.isGandalf ? 95 : 45));
         } catch(e) {}
     }
 
@@ -364,8 +407,7 @@ window.addEventListener('load', function() {
         try {
             let str = localStorage.getItem('stormblade_save');
             if (str) {
-                let d = JSON.parse(str);
-                Object.assign(player, d);
+                let d = JSON.parse(str); Object.assign(player, d);
                 if (d.name) nameModal.style.display = 'none';
             }
         } catch(e) {}
@@ -375,8 +417,7 @@ window.addEventListener('load', function() {
 
     // WORLD GENERATION
     function getRandomTreeType() {
-        let rand = Math.random() * 100;
-        let cumulative = 0;
+        let rand = Math.random() * 100, cumulative = 0;
         for (let key in TREE_TYPES) {
             cumulative += TREE_TYPES[key].weight;
             if (rand <= cumulative) return key;
@@ -385,6 +426,7 @@ window.addEventListener('load', function() {
     }
 
     function generateChunk(cx, cy) {
+        if (currentMap === 'city') return;
         let key = cx + '_' + cy;
         if (chunksGenerated[key]) return;
         chunksGenerated[key] = true;
@@ -392,7 +434,7 @@ window.addEventListener('load', function() {
         for (let i = 0; i < count; i++) {
             let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
             let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
-            if (Math.hypot(tx - merchant.x, ty - merchant.y) < 180) continue; 
+            if (Math.hypot(tx - forestMerchant.x, ty - forestMerchant.y) < 180 || Math.hypot(tx - forestPlane.x, ty - forestPlane.y) < 200) continue; 
             trees.push({ type: getRandomTreeType(), x: tx, y: ty });
         }
         if (Math.random() < 0.45 && (cx !== 0 || cy !== 0)) {
@@ -413,6 +455,21 @@ window.addEventListener('load', function() {
         return 'seaweed';
     }
 
+    function triggerFlight(targetMap) {
+        flightOverlay.style.display = 'flex';
+        flightText.innerText = targetMap === 'city' ? 'FLYING TO CITY SQUARE...' : 'FLYING BACK TO FOREST...';
+        setTimeout(() => {
+            currentMap = targetMap;
+            if (currentMap === 'city') {
+                player.x = cityPlane.x; player.y = cityPlane.y + 60;
+            } else {
+                player.x = forestPlane.x; player.y = forestPlane.y + 60;
+            }
+            broadcastPosition();
+            flightOverlay.style.display = 'none';
+        }, 1800);
+    }
+
     window.addEventListener('keydown', function(e) {
         if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput) return;
         if (e.key === 'Enter') { chatInput.focus(); return; }
@@ -420,19 +477,31 @@ window.addEventListener('load', function() {
         keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
         
         if (inMenu) {
-            let ui = menuType === 'shop' ? ['btn-sell','btn-upgrade'] : ['craft-rod','craft-speed','craft-luck','craft-hitbox','craft-timmah'];
-            let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : 'adm-exit');
-            let num = parseInt(e.key);
-            if (menuType !== 'admin' && num > 0 && num <= ui.length) document.getElementById(ui[num-1]).click();
+            let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : (menuType === 'iga' ? 'iga-exit' : 'adm-exit'));
             if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById(exitBtn).click();
             return; 
         }
 
         if (e.key.toLowerCase() === 'e') {
-            if (Math.hypot(merchant.x+20 - (player.x+20), merchant.y+20 - (player.y+20)) < 80) {
-                inMenu = true; menuType = 'shop'; shopDiv.style.display = 'block'; updateUIs();
-            } else if (Math.hypot(craftingTable.x+20 - (player.x+20), craftingTable.y+20 - (player.y+20)) < 80) {
-                inMenu = true; menuType = 'crafting'; craftDiv.style.display = 'block'; updateUIs();
+            let pCenter = { x: player.x+20, y: player.y+20 };
+            let activePlane = currentMap === 'forest' ? forestPlane : cityPlane;
+            if (Math.hypot(activePlane.x - pCenter.x, activePlane.y - pCenter.y) < 110) {
+                triggerFlight(currentMap === 'forest' ? 'city' : 'forest');
+                return;
+            }
+
+            let mPos = currentMap === 'forest' ? forestMerchant : cityMerchant;
+            if (Math.hypot(mPos.x+20 - pCenter.x, mPos.y+20 - pCenter.y) < 80) {
+                inMenu = true; menuType = 'shop'; shopDiv.style.display = 'block'; updateUIs(); return;
+            }
+
+            let cPos = currentMap === 'forest' ? forestCrafting : cityFisherMarket;
+            if (Math.hypot(cPos.x+20 - pCenter.x, cPos.y+20 - pCenter.y) < 80) {
+                inMenu = true; menuType = 'crafting'; craftDiv.style.display = 'block'; updateUIs(); return;
+            }
+
+            if (currentMap === 'city' && Math.hypot(cityIGA.x+20 - pCenter.x, cityIGA.y+20 - pCenter.y) < 100) {
+                inMenu = true; menuType = 'iga'; igaDiv.style.display = 'block'; updateUIs(); return;
             }
         }
     });
@@ -442,12 +511,12 @@ window.addEventListener('load', function() {
     });
 
     function updateUIs() {
-        document.getElementById('btn-upgrade').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat) [2]`;
-        document.getElementById('craft-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) [1] - 10 Seaweed (Have: ${player.fishLoot.seaweed||0})`;
-        document.getElementById('craft-speed').innerText = `Swift Boots (+Speed) [2] - 8 Fish Scales (Have: ${player.fishLoot.fishScales||0})`;
-        document.getElementById('craft-luck').innerText = `Shark Luck Charm (+Tree Luck) [3] - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth||0})`;
-        document.getElementById('craft-hitbox').innerText = `Dolphin Ring (+Multi-Chop) [4] - 3 Dolphin Tails (Have: ${player.fishLoot.dolphinTail||0})`;
-        document.getElementById('craft-timmah').innerText = `Timmah's Blessing (+ALL STATS) [5] - 1 Timmah Gold (Have: ${player.fishLoot.timmahsGold||0})`;
+        document.getElementById('lbl-axe-up').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat) [2]`;
+        document.getElementById('lbl-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) - 10 Seaweed (Have: ${player.fishLoot.seaweed||0})`;
+        document.getElementById('lbl-speed').innerText = `Swift Boots (+Speed) - 8 Fish Scales (Have: ${player.fishLoot.fishScales||0})`;
+        document.getElementById('lbl-luck').innerText = `Shark Luck Charm (+Tree Luck) - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth||0})`;
+        document.getElementById('lbl-multi').innerText = `Dolphin Ring (+Multi-Chop) - 3 Dolphin Tails (Have: ${player.fishLoot.dolphinTail||0})`;
+        document.getElementById('lbl-timmah').innerText = `Timmah's Blessing (+ALL STATS) - 1 Timmah Gold (Have: ${player.fishLoot.timmahsGold||0})`;
     }
 
     document.getElementById('btn-sell').onclick = function() {
@@ -460,12 +529,19 @@ window.addEventListener('load', function() {
             player.platinum -= player.axe_level * 50; player.axe_level++; player.axe_damage++; updateUIs(); saveGame();
         }
     };
-    const exitShop = () => { inMenu = false; menuType = null; shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; adminDiv.style.display = 'none'; };
+    const exitShop = () => { 
+        inMenu = false; menuType = null; 
+        shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; 
+        igaDiv.style.display = 'none'; adminDiv.style.display = 'none'; 
+    };
     document.getElementById('btn-exit').onclick = exitShop; 
     document.getElementById('craft-exit').onclick = exitShop;
+    document.getElementById('iga-exit').onclick = exitShop;
     document.getElementById('adm-exit').onclick = exitShop;
 
-    // --- ADMIN CHEAT BUTTONS ---
+    document.getElementById('iga-rename').onclick = () => { exitShop(); usernameInput.value = player.name; nameModal.style.display = 'flex'; };
+
+    // ADMIN CHEAT BUTTONS
     document.getElementById('adm-plat').onclick = () => { player.platinum += 1000; spawnPopUp("+1000 Platinum!", "#9b59b6", player.x, player.y-40); saveGame(); };
     document.getElementById('adm-wood').onclick = () => { 
         for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+100; 
@@ -484,8 +560,14 @@ window.addEventListener('load', function() {
         player.unlockedHats = ['none','headband','wizard','crown'];
         spawnPopUp("Unlocked All Cosmetics!", "#e74c3c", player.x, player.y-40); saveGame(); 
     };
+    document.getElementById('adm-gandalf').onclick = () => {
+        player.isGandalf = !player.isGandalf;
+        player.scale = player.isGandalf ? 3.0 : 1.0;
+        spawnPopUp(player.isGandalf ? "3x Gandalf Mode ON!" : "Gandalf Mode OFF", "#ffffff", player.x, player.y-40);
+        broadcastPosition();
+        saveGame();
+    };
 
-    // AVATAR SHOP PURCHASES
     function buyOutfit(color, cost) {
         if (player.unlockedOutfits.includes(color)) {
             player.bodyColor = color; spawnPopUp("Equipped Outfit!", "#3498db", player.x, player.y-40); broadcastPosition(); saveGame();
@@ -513,7 +595,6 @@ window.addEventListener('load', function() {
     document.getElementById('buy-hat-wizard').onclick = () => buyHat('wizard', 150);
     document.getElementById('buy-hat-crown').onclick = () => buyHat('crown', 300);
 
-    // CRAFTING LOGIC
     document.getElementById('craft-rod').onclick = function() {
         if (player.fishLoot.seaweed >= 10) { player.fishLoot.seaweed -= 10; player.rod_level++; spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y-40); updateUIs(); saveGame(); }
     };
@@ -545,20 +626,24 @@ window.addEventListener('load', function() {
 
             if (moved) broadcastPosition();
 
-            let cx = Math.floor(player.x/CHUNK_SIZE), cy = Math.floor(player.y/CHUNK_SIZE);
-            for(let x=cx-1; x<=cx+1; x++) for(let y=cy-1; y<=cy+1; y++) generateChunk(x,y);
+            if (currentMap === 'forest') {
+                let cx = Math.floor(player.x/CHUNK_SIZE), cy = Math.floor(player.y/CHUNK_SIZE);
+                for(let x=cx-1; x<=cx+1; x++) for(let y=cy-1; y<=cy+1; y++) generateChunk(x,y);
+            }
         }
 
         let isSpace = keys['Space'] || keys['space'];
         let pCenter = {x: player.x+20, y: player.y+20};
         
         let matchedTrees = [];
-        for (let t of trees) {
-            if (Math.hypot(pCenter.x - (t.x+40), pCenter.y - (t.y+40)) < player.axe_range) {
-                matchedTrees.push(t); if(!player.axe_multi) break;
+        if (currentMap === 'forest') {
+            for (let t of trees) {
+                if (Math.hypot(pCenter.x - (t.x+40), pCenter.y - (t.y+40)) < player.axe_range) {
+                    matchedTrees.push(t); if(!player.axe_multi) break;
+                }
             }
         }
-        let nearbyPond = ponds.find(p => Math.hypot(pCenter.x - p.x, pCenter.y - p.y) < p.r + 45);
+        let nearbyPond = currentMap === 'forest' ? ponds.find(p => Math.hypot(pCenter.x - p.x, pCenter.y - p.y) < p.r + 45) : null;
 
         if (isSpace && nearbyPond && matchedTrees.length===0 && !inMenu) {
             player.choppingTarget = null;
@@ -621,100 +706,190 @@ window.addEventListener('load', function() {
         }
     }
 
-    function drawModel(x, y, facing, color='#b02323', hat='none') {
-        ctx.fillStyle = '#1b365d'; ctx.fillRect(x+10, y+30, 8, 10); ctx.fillRect(x+22, y+30, 8, 10);
-        ctx.fillStyle = color; ctx.fillRect(x+8, y+16, 24, 14);
-        ctx.fillStyle = '#6b1111'; ctx.fillRect(x+12, y+16, 4, 14); ctx.fillRect(x+20, y+16, 4, 14);
-        ctx.fillStyle = '#f5c6a5'; ctx.fillRect(x+12, y+2, 16, 14);
+    function drawPlane(x, y, label) {
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x, y+25, 90, 25, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.ellipse(x, y, 75, 22, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#bdc3c7'; ctx.beginPath(); ctx.ellipse(x, y, 110, 18, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#e74c3c'; ctx.fillRect(x-105, y-12, 18, 24); ctx.fillRect(x-105, y-25, 12, 14);
+        ctx.fillStyle = '#3498db';
+        for(let i=-60; i<=60; i+=20) { ctx.fillRect(x+i, y-5, 8, 6); }
         
-        ctx.fillStyle = '#3a2212';
-        if (facing === 'up') { ctx.fillRect(x+12, y+2, 16, 14); } 
-        else {
-            ctx.fillRect(x+12, y+2, 16, 4);
-            if (facing === 'down') { ctx.fillStyle='black'; ctx.fillRect(x+15, y+7, 3,3); ctx.fillRect(x+22, y+7, 3,3); }
-            else if (facing === 'left') { ctx.fillStyle='black'; ctx.fillRect(x+14, y+7, 3,3); }
-            else if (facing === 'right') { ctx.fillStyle='black'; ctx.fillRect(x+23, y+7, 3,3); }
+        let bob = Math.sin(Date.now() / 200) * 8;
+        ctx.fillStyle = '#f1c40f'; ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y-45+bob); ctx.lineTo(x-15, y-65+bob); ctx.lineTo(x-6, y-65+bob); ctx.lineTo(x-6, y-85+bob); ctx.lineTo(x+6, y-85+bob); ctx.lineTo(x+6, y-65+bob); ctx.lineTo(x+15, y-65+bob); ctx.closePath(); ctx.fill(); ctx.stroke();
+        
+        ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center';
+        ctx.fillText(label, x, y-95+bob);
+    }
+
+    function drawModel(x, y, facing, color='#b02323', hat='none', isGandalf=false, scale=1.0) {
+        ctx.save();
+        ctx.translate(x + 20, y + 20);
+        ctx.scale(scale, scale);
+        ctx.translate(-20, -20);
+
+        if (isGandalf) {
+            // Magical Holy Aura
+            let pulse = Math.sin(Date.now() / 150) * 4;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.beginPath(); ctx.arc(20, 20, 32 + pulse, 0, Math.PI*2); ctx.fill();
+
+            // White Robes & Belt
+            ctx.fillStyle = '#e6e6e6'; ctx.fillRect(8, 16, 24, 24);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(12, 16, 16, 24);
+            ctx.fillStyle = '#d4af37'; ctx.fillRect(10, 26, 20, 3); // Gold Sash
+
+            // Boots
+            ctx.fillStyle = '#5c4033'; ctx.fillRect(10, 38, 8, 6); ctx.fillRect(22, 38, 8, 6);
+
+            // Skin Head
+            ctx.fillStyle = '#f5c6a5'; ctx.fillRect(12, 2, 16, 14);
+
+            // Long Flowing White Beard
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(10, 10); ctx.lineTo(30, 10); ctx.lineTo(26, 30); ctx.lineTo(20, 35); ctx.lineTo(14, 30);
+            ctx.closePath(); ctx.fill();
+
+            // Eyes
+            if (facing !== 'up') {
+                ctx.fillStyle = '#2c3e50';
+                if (facing === 'down') { ctx.fillRect(15, 7, 3, 3); ctx.fillRect(22, 7, 3, 3); }
+                else if (facing === 'left') { ctx.fillRect(13, 7, 3, 3); }
+                else if (facing === 'right') { ctx.fillRect(24, 7, 3, 3); }
+            }
+
+            // Gandalf Wizard Hat
+            ctx.fillStyle = '#dcdde1';
+            ctx.beginPath(); ctx.moveTo(20, -14); ctx.lineTo(6, 4); ctx.lineTo(34, 4); ctx.fill();
+            ctx.fillRect(4, 3, 32, 3);
+
+            // Wizard Wooden Staff with Glowing Orb
+            let ox = (facing === 'right' || facing === 'down') ? 34 : -4;
+            ctx.fillStyle = '#4a2e16'; ctx.fillRect(ox, -6, 4, 46);
+            ctx.fillStyle = '#00d2d3'; ctx.beginPath(); ctx.arc(ox + 2, -8, 5 + pulse*0.5, 0, Math.PI*2); ctx.fill();
+        } else {
+            // Standard Hero Model
+            ctx.fillStyle = '#1b365d'; ctx.fillRect(10, 30, 8, 10); ctx.fillRect(22, 30, 8, 10);
+            ctx.fillStyle = color; ctx.fillRect(8, 16, 24, 14);
+            ctx.fillStyle = '#6b1111'; ctx.fillRect(12, 16, 4, 14); ctx.fillRect(20, 16, 4, 14);
+            ctx.fillStyle = '#f5c6a5'; ctx.fillRect(12, 2, 16, 14);
+            
+            ctx.fillStyle = '#3a2212';
+            if (facing === 'up') { ctx.fillRect(12, 2, 16, 14); } 
+            else {
+                ctx.fillRect(12, 2, 16, 4);
+                if (facing === 'down') { ctx.fillStyle='black'; ctx.fillRect(15, 7, 3,3); ctx.fillRect(22, 7, 3,3); }
+                else if (facing === 'left') { ctx.fillStyle='black'; ctx.fillRect(14, 7, 3,3); }
+                else if (facing === 'right') { ctx.fillStyle='black'; ctx.fillRect(23, 7, 3,3); }
+            }
+
+            if (hat === 'headband') {
+                ctx.fillStyle = '#e74c3c'; ctx.fillRect(10, 3, 20, 3);
+            } else if (hat === 'wizard') {
+                ctx.fillStyle = '#8e44ad';
+                ctx.beginPath(); ctx.moveTo(20, -10); ctx.lineTo(8, 2); ctx.lineTo(32, 2); ctx.fill();
+                ctx.fillStyle = '#f1c40f'; ctx.fillRect(8, 1, 24, 2);
+            } else if (hat === 'crown') {
+                ctx.fillStyle = '#f1c40f';
+                ctx.fillRect(10, -2, 20, 5);
+                ctx.beginPath(); ctx.moveTo(10, -2); ctx.lineTo(10, -7); ctx.lineTo(15, -2); ctx.lineTo(20, -8); ctx.lineTo(25, -2); ctx.lineTo(30, -7); ctx.lineTo(30, -2); ctx.fill();
+            }
         }
 
-        // Render Accessories & Hats
-        if (hat === 'headband') {
-            ctx.fillStyle = '#e74c3c'; ctx.fillRect(x+10, y+3, 20, 3);
-        } else if (hat === 'wizard') {
-            ctx.fillStyle = '#8e44ad';
-            ctx.beginPath(); ctx.moveTo(x+20, y-10); ctx.lineTo(x+8, y+2); ctx.lineTo(x+32, y+2); ctx.fill();
-            ctx.fillStyle = '#f1c40f'; ctx.fillRect(x+8, y+1, 24, 2);
-        } else if (hat === 'crown') {
-            ctx.fillStyle = '#f1c40f';
-            ctx.fillRect(x+10, y-2, 20, 5);
-            ctx.beginPath(); ctx.moveTo(x+10, y-2); ctx.lineTo(x+10, y-7); ctx.lineTo(x+15, y-2); ctx.lineTo(x+20, y-8); ctx.lineTo(x+25, y-2); ctx.lineTo(x+30, y-7); ctx.lineTo(x+30, y-2); ctx.fill();
-        }
+        ctx.restore();
     }
 
     function draw() {
         let camX = Math.floor(WIDTH/2 - player.x - 20), camY = Math.floor(HEIGHT/2 - player.y - 20);
 
-        ctx.fillStyle = grassPattern || '#3b5e2b'; ctx.save();
-        ctx.translate(camX % 64, camY % 64); ctx.fillRect(-64, -64, WIDTH+128, HEIGHT+128); ctx.restore();
+        if (currentMap === 'forest') {
+            ctx.fillStyle = grassPattern || '#3b5e2b'; ctx.save();
+            ctx.translate(camX % 64, camY % 64); ctx.fillRect(-64, -64, WIDTH+128, HEIGHT+128); ctx.restore();
+        } else {
+            ctx.fillStyle = '#7f8c8d'; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            ctx.save(); ctx.translate(camX, camY);
+            ctx.fillStyle = '#34495e'; ctx.fillRect(-1000, -50, 2000, 100); ctx.fillRect(-50, -1000, 100, 2000);
+            ctx.fillStyle = '#f1c40f'; 
+            for(let rx=-950; rx<950; rx+=60) ctx.fillRect(rx, -2, 30, 4);
+            ctx.restore();
+        }
 
         ctx.save(); ctx.translate(camX, camY);
-
-        // Ponds
-        ponds.forEach(p => {
-            if (Math.abs(p.x - player.x) > WIDTH || Math.abs(p.y - player.y) > HEIGHT) return;
-            ctx.fillStyle = '#2c4c1e'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r+6, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#2980b9'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(p.x-8, p.y-8, p.r*0.5, 0, Math.PI*2); ctx.fill();
-        });
-
-        // Merchant
-        ctx.fillStyle='#781d1d'; ctx.fillRect(merchant.x-20, merchant.y-10, 80, 60);
-        ctx.fillStyle='#f1c40f'; ctx.fillRect(merchant.x-20, merchant.y-10, 80, 4); ctx.fillRect(merchant.x-20, merchant.y+46, 80, 4);
-        drawModel(merchant.x-4, merchant.y-10, 'down', '#e74c3c', 'wizard'); 
-        
-        // Crafting
-        ctx.fillStyle='#5c3a21'; ctx.fillRect(craftingTable.x-10, craftingTable.y-5, 60, 50);
-        ctx.fillStyle='#2ecc71'; ctx.fillRect(craftingTable.x-12, craftingTable.y-8, 64, 12);
-
         let time = Date.now();
-        
-        // Trees
-        trees.forEach(t => {
-            if (Math.abs(t.x - player.x) > WIDTH || Math.abs(t.y - player.y) > HEIGHT) return;
-            let sway = Math.sin(time/350 + t.x) * 4;
-            let tData = TREE_TYPES[t.type] || TREE_TYPES.oak;
-            
-            ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(t.x+40, t.y+75, 32, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = tData.trunk; ctx.fillRect(t.x+28, t.y+35, 24, 45);
-            let leaf = t.type === 'majestic' ? `hsl(${Math.floor((time/10+t.x)%360)}, 85%, 55%)` : tData.color;
-            ctx.fillStyle = leaf;
 
-            if (t.type === 'pine') {
-                ctx.beginPath(); ctx.moveTo(t.x+40+sway, t.y-15); ctx.lineTo(t.x+5, t.y+30); ctx.lineTo(t.x+75, t.y+30); ctx.fill();
-                ctx.beginPath(); ctx.moveTo(t.x+40+sway, t.y+10); ctx.lineTo(t.x+10, t.y+50); ctx.lineTo(t.x+70, t.y+50); ctx.fill();
-            } else {
-                ctx.beginPath(); ctx.arc(t.x+40+sway, t.y+10, 38, 0, Math.PI*2); ctx.arc(t.x+15+sway, t.y+30, 30, 0, Math.PI*2); ctx.arc(t.x+65+sway, t.y+30, 30, 0, Math.PI*2); ctx.fill();
-            }
-        });
+        if (currentMap === 'forest') {
+            ponds.forEach(p => {
+                if (Math.abs(p.x - player.x) > WIDTH || Math.abs(p.y - player.y) > HEIGHT) return;
+                ctx.fillStyle = '#2c4c1e'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r+6, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#2980b9'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc(p.x-8, p.y-8, p.r*0.5, 0, Math.PI*2); ctx.fill();
+            });
+
+            ctx.fillStyle='#781d1d'; ctx.fillRect(forestMerchant.x-20, forestMerchant.y-10, 80, 60);
+            ctx.fillStyle='#f1c40f'; ctx.fillRect(forestMerchant.x-20, forestMerchant.y-10, 80, 4); ctx.fillRect(forestMerchant.x-20, forestMerchant.y+46, 80, 4);
+            drawModel(forestMerchant.x-4, forestMerchant.y-10, 'down', '#e74c3c', 'wizard'); 
+            
+            ctx.fillStyle='#5c3a21'; ctx.fillRect(forestCrafting.x-10, forestCrafting.y-5, 60, 50);
+            ctx.fillStyle='#2ecc71'; ctx.fillRect(forestCrafting.x-12, forestCrafting.y-8, 64, 12);
+
+            trees.forEach(t => {
+                if (Math.abs(t.x - player.x) > WIDTH || Math.abs(t.y - player.y) > HEIGHT) return;
+                let sway = Math.sin(time/350 + t.x) * 4;
+                let tData = TREE_TYPES[t.type] || TREE_TYPES.oak;
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(t.x+40, t.y+75, 32, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = tData.trunk; ctx.fillRect(t.x+28, t.y+35, 24, 45);
+                let leaf = t.type === 'majestic' ? `hsl(${Math.floor((time/10+t.x)%360)}, 85%, 55%)` : tData.color;
+                ctx.fillStyle = leaf;
+
+                if (t.type === 'pine') {
+                    ctx.beginPath(); ctx.moveTo(t.x+40+sway, t.y-15); ctx.lineTo(t.x+5, t.y+30); ctx.lineTo(t.x+75, t.y+30); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(t.x+40+sway, t.y+10); ctx.lineTo(t.x+10, t.y+50); ctx.lineTo(t.x+70, t.y+50); ctx.fill();
+                } else {
+                    ctx.beginPath(); ctx.arc(t.x+40+sway, t.y+10, 38, 0, Math.PI*2); ctx.arc(t.x+15+sway, t.y+30, 30, 0, Math.PI*2); ctx.arc(t.x+65+sway, t.y+30, 30, 0, Math.PI*2); ctx.fill();
+                }
+            });
+
+            drawPlane(forestPlane.x, forestPlane.y, "PRESS E TO FLY TO CITY");
+        } else {
+            ctx.fillStyle = '#2c3e50'; ctx.fillRect(cityMerchant.x-50, cityMerchant.y-60, 140, 100);
+            ctx.fillStyle = '#f39c12'; ctx.fillRect(cityMerchant.x-50, cityMerchant.y-60, 140, 15);
+            ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center'; ctx.fillText("GRAND MERCHANT", cityMerchant.x+20, cityMerchant.y-48);
+            drawModel(cityMerchant.x, cityMerchant.y, 'down', '#f39c12', 'crown');
+
+            ctx.fillStyle = '#16a085'; ctx.fillRect(cityFisherMarket.x-50, cityFisherMarket.y-60, 140, 100);
+            ctx.fillStyle = '#2ecc71'; ctx.fillRect(cityFisherMarket.x-50, cityFisherMarket.y-60, 140, 15);
+            ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center'; ctx.fillText("FISHER MARKET", cityFisherMarket.x+20, cityFisherMarket.y-48);
+            drawModel(cityFisherMarket.x, cityFisherMarket.y, 'down', '#2ecc71', 'headband');
+
+            ctx.fillStyle = '#c0392b'; ctx.fillRect(cityIGA.x-60, cityIGA.y-60, 160, 100);
+            ctx.fillStyle = 'white'; ctx.fillRect(cityIGA.x-60, cityIGA.y-60, 160, 15);
+            ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 14px Arial'; ctx.textAlign='center'; ctx.fillText("IGA SUPERMARKET", cityIGA.x+20, cityIGA.y-48);
+            drawModel(cityIGA.x, cityIGA.y, 'down', '#e74c3c', 'none');
+
+            drawPlane(cityPlane.x, cityPlane.y, "PRESS E TO FLY TO FOREST");
+        }
 
         // Other Players (PeerJS Connected)
         for (let pid in otherPlayers) {
             let op = otherPlayers[pid];
-            if (time - op.lastSeen > 8000) { delete otherPlayers[pid]; continue; }
-            drawModel(op.x, op.y, op.facing, op.bodyColor || '#2980b9', op.hat || 'none');
-            ctx.fillStyle = '#3498db'; ctx.font = 'bold 11px Arial'; ctx.textAlign='center';
-            ctx.fillText(op.name || "Player", op.x+20, op.y-12);
+            if (time - op.lastSeen > 8000 || op.map !== currentMap) continue;
+            drawModel(op.x, op.y, op.facing, op.bodyColor || '#2980b9', op.hat || 'none', op.isGandalf, op.scale || 1.0);
+            ctx.fillStyle = op.isGandalf ? '#f1c40f' : '#3498db'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center';
+            ctx.fillText(op.name || "Player", op.x+20, op.y - (op.isGandalf ? 45 : 12));
         }
 
-        // Self Character
-        drawModel(player.x, player.y, player.facing, player.bodyColor, player.hat);
-        ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 11px Arial'; ctx.textAlign='center'; 
-        ctx.fillText(player.name + " (You)", player.x+20, player.y-12);
+        // Self Character Rendering
+        drawModel(player.x, player.y, player.facing, player.bodyColor, player.hat, player.isGandalf, player.scale);
+        ctx.fillStyle = player.isGandalf ? '#f1c40f' : '#2ecc71'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center'; 
+        ctx.fillText(player.name + " (You)", player.x+20, player.y - (player.isGandalf ? 45 : 12));
 
         // Tool Visuals
         if (player.fishingTarget) {
             ctx.strokeStyle = '#d2b48c'; ctx.lineWidth = 3; ctx.beginPath();
             ctx.moveTo(player.x+20, player.y+20); ctx.lineTo(player.fishingTarget.x, player.fishingTarget.y); ctx.stroke();
-        } else {
+        } else if (!player.isGandalf) {
             let ox = (player.facing === 'right' || player.facing === 'down') ? 28 : 2;
             ctx.fillStyle = '#5c4033'; ctx.fillRect(player.x+ox, player.y+18, 4, 16);
             ctx.fillStyle = '#bdc3c7'; ctx.fillRect(player.x+ox-2, player.y+16, 8, 8);
@@ -724,9 +899,9 @@ window.addEventListener('load', function() {
         if (player.choppingTarget || player.fishingTarget) {
             let req = player.choppingTarget ? (10000 / player.axe_damage) : (6000 / player.rod_level);
             let prog = player.choppingTarget ? player.chopProgress : player.fishProgress;
-            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x-10, player.y-22, 60, 10);
+            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x-10, player.y - (player.isGandalf ? 55 : 22), 60, 10);
             ctx.fillStyle = player.choppingTarget ? '#2ecc71' : '#3498db';
-            ctx.fillRect(player.x-8, player.y-20, 56 * Math.min(1, prog/req), 6);
+            ctx.fillRect(player.x-8, player.y - (player.isGandalf ? 53 : 20), 56 * Math.min(1, prog/req), 6);
         }
 
         particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4); });
