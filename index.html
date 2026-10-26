@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stormblade</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,6 +37,7 @@
     border: 3px solid #daa520; 
     padding: 20px; 
     width: 440px; 
+    max-width: 90vw;
     text-align: center; 
     color: white; 
     border-radius: 8px; 
@@ -187,30 +189,38 @@ window.addEventListener('load', function() {
     let respawnQueue = [];
     let screenShake = 0;
 
-    // --- Save & Load System ---
+    function spawnPopUp(text, color, x, y) {
+        popups.push({ text: text, color: color, x: x, y: y, life: 45, vy: -1.2 });
+    }
+
+    // --- Safe Save & Load System ---
     function saveGame() {
-        const saveData = {
-            x: player.x,
-            y: player.y,
-            speed: player.speed,
-            platinum: player.platinum,
-            inventory: player.inventory,
-            fishLoot: player.fishLoot,
-            axe_level: player.axe_level,
-            axe_damage: player.axe_damage,
-            axe_range: player.axe_range,
-            axe_multi: player.axe_multi,
-            rod_level: player.rod_level,
-            rod_luck: player.rod_luck
-        };
-        localStorage.setItem('stormblade_save', JSON.stringify(saveData));
-        spawnPopUp("💾 Game Saved!", "#f1c40f", player.x, player.y - 45);
+        try {
+            const saveData = {
+                x: player.x,
+                y: player.y,
+                speed: player.speed,
+                platinum: player.platinum,
+                inventory: player.inventory,
+                fishLoot: player.fishLoot,
+                axe_level: player.axe_level,
+                axe_damage: player.axe_damage,
+                axe_range: player.axe_range,
+                axe_multi: player.axe_multi,
+                rod_level: player.rod_level,
+                rod_luck: player.rod_luck
+            };
+            localStorage.setItem('stormblade_save', JSON.stringify(saveData));
+            spawnPopUp("💾 Game Saved!", "#f1c40f", player.x, player.y - 45);
+        } catch(e) {
+            console.warn("Storage save failed:", e);
+        }
     }
 
     function loadGame() {
-        const dataStr = localStorage.getItem('stormblade_save');
-        if (dataStr) {
-            try {
+        try {
+            const dataStr = localStorage.getItem('stormblade_save');
+            if (dataStr) {
                 const data = JSON.parse(dataStr);
                 if (data.x !== undefined) player.x = data.x;
                 if (data.y !== undefined) player.y = data.y;
@@ -224,16 +234,13 @@ window.addEventListener('load', function() {
                 if (data.axe_multi !== undefined) player.axe_multi = data.axe_multi;
                 if (data.rod_level !== undefined) player.rod_level = data.rod_level;
                 if (data.rod_luck !== undefined) player.rod_luck = data.rod_luck;
-            } catch(e) {
-                console.error("Save loading error:", e);
             }
+        } catch(e) {
+            console.warn("Storage load failed:", e);
         }
     }
 
-    // Load initial save data
     loadGame();
-
-    // Auto-save every 10 seconds
     setInterval(saveGame, 10000);
 
     function getRandomTreeType() {
@@ -280,12 +287,8 @@ window.addEventListener('load', function() {
         }
     }
 
-    function spawnPopUp(text, color, x, y) {
-        popups.push({ text: text, color: color, x: x, y: y, life: 45, vy: -1.2 });
-    }
-
     function spawnWoodChips(x, y, treeType) {
-        let chipColor = TREE_TYPES[treeType].trunk;
+        let chipColor = (TREE_TYPES[treeType] && TREE_TYPES[treeType].trunk) || '#4a2e16';
         if (treeType === 'majestic') chipColor = 'hsl(' + Math.floor(Math.random() * 360) + ', 100%, 60%)';
         else if (treeType === 'golden') chipColor = '#f1c40f';
 
@@ -366,17 +369,18 @@ window.addEventListener('load', function() {
     }
 
     function updateCraftingUI() {
-        document.getElementById('craft-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) [1] - 10 Seaweed (Have: ${player.fishLoot.seaweed})`;
-        document.getElementById('craft-speed').innerText = `Swift Boots (+Speed) [2] - 8 Fish Scales (Have: ${player.fishLoot.fishScales})`;
-        document.getElementById('craft-luck').innerText = `Shark Luck Charm (+Luck) [3] - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth})`;
-        document.getElementById('craft-hitbox').innerText = `Dolphin Ring (+Multi-Chop) [4] - 3 Dolphin Tails (Have: ${player.fishLoot.dolphinTail})`;
-        document.getElementById('craft-timmah').innerText = `Timmah's Blessing (+ALL STATS) [5] - 1 Timmah Gold (Have: ${player.fishLoot.timmahsGold})`;
+        document.getElementById('craft-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) [1] - 10 Seaweed (Have: ${player.fishLoot.seaweed || 0})`;
+        document.getElementById('craft-speed').innerText = `Swift Boots (+Speed) [2] - 8 Fish Scales (Have: ${player.fishLoot.fishScales || 0})`;
+        document.getElementById('craft-luck').innerText = `Shark Luck Charm (+Luck) [3] - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth || 0})`;
+        document.getElementById('craft-hitbox').innerText = `Dolphin Ring (+Multi-Chop) [4] - 3 Dolphin Tails (Have: ${player.fishLoot.dolphinTail || 0})`;
+        document.getElementById('craft-timmah').innerText = `Timmah's Blessing (+ALL STATS) [5] - 1 Timmah Gold (Have: ${player.fishLoot.timmahsGold || 0})`;
     }
 
     document.getElementById('btn-sell').onclick = function() {
         let earned = 0;
         for (let type in player.inventory) {
-            earned += player.inventory[type] * TREE_TYPES[type].val;
+            let val = (TREE_TYPES[type] && TREE_TYPES[type].val) || 5;
+            earned += (player.inventory[type] || 0) * val;
             player.inventory[type] = 0;
         }
         player.platinum += earned;
@@ -400,9 +404,8 @@ window.addEventListener('load', function() {
         shopDiv.style.display = 'none';
     };
 
-    // Crafting Actions
     document.getElementById('craft-rod').onclick = function() {
-        if (player.fishLoot.seaweed >= 10) {
+        if ((player.fishLoot.seaweed || 0) >= 10) {
             player.fishLoot.seaweed -= 10;
             player.rod_level += 1;
             spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y - 40);
@@ -411,7 +414,7 @@ window.addEventListener('load', function() {
         }
     };
     document.getElementById('craft-speed').onclick = function() {
-        if (player.fishLoot.fishScales >= 8) {
+        if ((player.fishLoot.fishScales || 0) >= 8) {
             player.fishLoot.fishScales -= 8;
             player.speed += 1.2;
             spawnPopUp("Movement Speed Increased!", "#3498db", player.x, player.y - 40);
@@ -420,4 +423,541 @@ window.addEventListener('load', function() {
         }
     };
     document.getElementById('craft-luck').onclick = function() {
-        if (player.fishLoot.sharkTeeth >=
+        if ((player.fishLoot.sharkTeeth || 0) >= 5) {
+            player.fishLoot.sharkTeeth -= 5;
+            player.rod_luck += 0.5;
+            spawnPopUp("Rod Luck Boosted!", "#95a5a6", player.x, player.y - 40);
+            updateCraftingUI();
+            saveGame();
+        }
+    };
+    document.getElementById('craft-hitbox').onclick = function() {
+        if ((player.fishLoot.dolphinTail || 0) >= 3) {
+            player.fishLoot.dolphinTail -= 3;
+            player.axe_range += 40;
+            player.axe_multi = true;
+            spawnPopUp("Multi-Tree Chop Unlocked!", "#9b59b6", player.x, player.y - 40);
+            updateCraftingUI();
+            saveGame();
+        }
+    };
+    document.getElementById('craft-timmah').onclick = function() {
+        if ((player.fishLoot.timmahsGold || 0) >= 1) {
+            player.fishLoot.timmahsGold -= 1;
+            player.speed += 1.5;
+            player.axe_damage += 2;
+            player.rod_level += 2;
+            player.rod_luck += 1.0;
+            player.axe_range += 30;
+            player.axe_multi = true;
+            spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y - 40);
+            updateCraftingUI();
+            saveGame();
+        }
+    };
+    document.getElementById('craft-exit').onclick = function() {
+        inMenu = false;
+        menuType = null;
+        craftDiv.style.display = 'none';
+    };
+
+    function getNearbyTrees() {
+        let pCenterX = player.x + PLAYER_SIZE / 2;
+        let pCenterY = player.y + PLAYER_SIZE / 2;
+        let matched = [];
+
+        for (let i = 0; i < trees.length; i++) {
+            let t = trees[i];
+            let tCenterX = t.x + TREE_SIZE / 2;
+            let tCenterY = t.y + TREE_SIZE / 2;
+            
+            let dist = Math.sqrt(Math.pow(pCenterX - tCenterX, 2) + Math.pow(pCenterY - tCenterY, 2));
+            if (dist < player.axe_range) {
+                matched.push(t);
+                if (!player.axe_multi) break; 
+            }
+        }
+        return matched;
+    }
+
+    function getNearbyPond() {
+        let pCenterX = player.x + PLAYER_SIZE / 2;
+        let pCenterY = player.y + PLAYER_SIZE / 2;
+
+        for (let i = 0; i < ponds.length; i++) {
+            let p = ponds[i];
+            let dist = Math.sqrt(Math.pow(pCenterX - p.x, 2) + Math.pow(pCenterY - p.y, 2));
+            if (dist < p.r + 45) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    function update(dt) {
+        if (!inMenu) {
+            let dx = 0, dy = 0;
+            if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
+            if (keys['s'] || keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
+            if (keys['a'] || keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
+            if (keys['d'] || keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
+
+            if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+
+            player.x += dx;
+            player.y += dy;
+            
+            updateWorldChunks();
+        }
+
+        let isHoldingSpace = keys['Space'] || keys['space'];
+        let nearbyTrees = getNearbyTrees();
+        let nearbyPond = getNearbyPond();
+
+        // Fishing Action
+        if (isHoldingSpace && nearbyPond && nearbyTrees.length === 0 && !inMenu) {
+            player.choppingTarget = null;
+            if (player.fishingTarget !== nearbyPond) {
+                player.fishingTarget = nearbyPond;
+                player.fishProgress = 0;
+            }
+
+            let requiredTime = BASE_FISH_TIME / player.rod_level;
+            player.fishProgress += dt;
+
+            if (Math.random() < 0.3) {
+                particles.push({
+                    x: nearbyPond.x + (Math.random() - 0.5) * nearbyPond.r,
+                    y: nearbyPond.y + (Math.random() - 0.5) * nearbyPond.r,
+                    vx: (Math.random() - 0.5) * 1,
+                    vy: (Math.random() - 0.5) * 1,
+                    life: 20,
+                    color: 'rgba(255,255,255,0.6)'
+                });
+            }
+
+            if (player.fishProgress >= requiredTime) {
+                let lootType = getFishDrop();
+                player.fishLoot[lootType] = (player.fishLoot[lootType] || 0) + 1;
+                let lootInfo = FISH_TYPES[lootType] || { name: lootType, color: '#fff' };
+                spawnPopUp(`Caught: ${lootInfo.name}!`, lootInfo.color, player.x, player.y - 30);
+                
+                player.fishingTarget = null;
+                player.fishProgress = 0;
+            }
+        } else {
+            player.fishingTarget = null;
+            player.fishProgress = 0;
+        }
+
+        // Tree Chopping Action
+        if (isHoldingSpace && nearbyTrees.length > 0 && !inMenu) {
+            player.fishingTarget = null;
+            let primaryTree = nearbyTrees[0];
+            if (player.choppingTarget !== primaryTree) {
+                player.choppingTarget = primaryTree;
+                player.chopProgress = 0;
+            }
+
+            let requiredTime = BASE_CHOP_TIME / player.axe_damage;
+            player.chopProgress += dt;
+
+            if (Math.random() < 0.35) {
+                for (let t of nearbyTrees) {
+                    spawnWoodChips(t.x + TREE_SIZE / 2, t.y + TREE_SIZE / 2, t.type);
+                }
+            }
+
+            if (player.chopProgress >= requiredTime) {
+                for (let targetTree of nearbyTrees) {
+                    for (let i = 0; i < trees.length; i++) {
+                        if (trees[i] === targetTree) {
+                            respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
+                            let type = targetTree.type || 'oak';
+                            player.inventory[type] = (player.inventory[type] || 0) + (Math.floor(Math.random() * 4) + 2);
+                            trees.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+                player.choppingTarget = null;
+                player.chopProgress = 0;
+                screenShake = 12;
+            }
+        } else if (!nearbyPond) {
+            player.choppingTarget = null;
+            player.chopProgress = 0;
+        }
+
+        // Majestic Particles
+        for (let i = 0; i < trees.length; i++) {
+            let t = trees[i];
+            if (t.type === 'majestic' && Math.random() < 0.15) {
+                particles.push({
+                    x: t.x + Math.random() * TREE_SIZE,
+                    y: t.y + Math.random() * (TREE_SIZE - 20),
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: -Math.random() * 2,
+                    life: 25,
+                    color: 'hsl(' + Math.floor(Math.random() * 360) + ', 100%, 70%)'
+                });
+            }
+        }
+
+        // Respawn Timers
+        let now = Date.now();
+        for (let i = respawnQueue.length - 1; i >= 0; i--) {
+            if (now - respawnQueue[i].time >= RESPAWN_TIME) {
+                trees.push({id: Math.random(), type: getRandomTreeType(), x: respawnQueue[i].x, y: respawnQueue[i].y});
+                respawnQueue.splice(i, 1);
+            }
+        }
+
+        // Particles Update
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Popups Update
+        for (let i = popups.length - 1; i >= 0; i--) {
+            let pop = popups[i];
+            pop.y += pop.vy;
+            pop.life--;
+            if (pop.life <= 0) popups.splice(i, 1);
+        }
+
+        if (screenShake > 0) screenShake--;
+    }
+
+    function draw() {
+        let camX = WIDTH / 2 - player.x - PLAYER_SIZE / 2;
+        let camY = HEIGHT / 2 - player.y - PLAYER_SIZE / 2;
+
+        if (screenShake > 0) {
+            camX += (Math.random() - 0.5) * 8;
+            camY += (Math.random() - 0.5) * 8;
+        }
+
+        ctx.fillStyle = grassPattern || '#3b5e2b';
+        ctx.save(); 
+        ctx.translate(camX % 64, camY % 64); 
+        ctx.fillRect(-64, -64, WIDTH + 128, HEIGHT + 128);
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(camX, camY);
+
+        // Render Ponds
+        for (let i = 0; i < ponds.length; i++) {
+            let p = ponds[i];
+            if (p.x > player.x - WIDTH/2 - 100 && p.x < player.x + WIDTH/2 + 100 && p.y > player.y - HEIGHT/2 - 100 && p.y < player.y + HEIGHT/2 + 100) {
+                ctx.fillStyle = '#2c4c1e';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#2980b9';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#3498db';
+                ctx.beginPath();
+                ctx.arc(p.x - 8, p.y - 8, p.r * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Merchant Structure
+        ctx.fillStyle = '#781d1d';
+        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 60);
+        ctx.fillStyle = '#f1c40f'; 
+        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 4);
+        ctx.fillRect(merchant.x - 20, merchant.y + 46, 80, 4);
+
+        ctx.fillStyle = '#4a2e16';
+        ctx.fillRect(merchant.x + 8, merchant.y + 8, 24, 26);
+        ctx.fillStyle = '#f5c6a5';
+        ctx.fillRect(merchant.x + 12, merchant.y - 2, 16, 12);
+        ctx.fillStyle = '#ecf0f1';
+        ctx.fillRect(merchant.x + 10, merchant.y + 8, 20, 16);
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(merchant.x + 8, merchant.y - 8, 24, 8);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(merchant.x + 14, merchant.y + 2, 3, 3);
+        ctx.fillRect(merchant.x + 23, merchant.y + 2, 3, 3);
+
+        // Crafting Table Structure
+        ctx.fillStyle = '#5c3a21';
+        ctx.fillRect(craftingTable.x - 10, craftingTable.y - 5, 60, 50);
+        ctx.fillStyle = '#2ecc71';
+        ctx.fillRect(craftingTable.x - 12, craftingTable.y - 8, 64, 12);
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(craftingTable.x + 16, craftingTable.y + 15, 8, 16);
+        ctx.fillRect(craftingTable.x + 10, craftingTable.y + 12, 20, 8);
+
+        let time = Date.now();
+        let nearbyTrees = getNearbyTrees();
+        let nearbyPond = getNearbyPond();
+
+        // Render Trees
+        for (let i = 0; i < trees.length; i++) {
+            let t = trees[i];
+            if (t.x > player.x - WIDTH/2 - 100 && t.x < player.x + WIDTH/2 + 100 && t.y > player.y - HEIGHT/2 - 100 && t.y < player.y + HEIGHT/2 + 100) {
+                let sway = Math.sin((time / 350) + t.x) * 4; 
+                let tData = TREE_TYPES[t.type] || TREE_TYPES['oak'];
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                ctx.beginPath();
+                ctx.arc(t.x + TREE_SIZE/2, t.y + TREE_SIZE - 5, 32, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = tData.trunk; 
+                ctx.fillRect(t.x + 28, t.y + 35, 24, 45);
+                if (t.type === 'birch') {
+                    ctx.fillStyle = '#333333';
+                    ctx.fillRect(t.x + 30, t.y + 45, 8, 3);
+                    ctx.fillRect(t.x + 38, t.y + 58, 8, 3);
+                    ctx.fillRect(t.x + 32, t.y + 68, 8, 3);
+                }
+
+                let leafColor = tData.color;
+                if (t.type === 'majestic') {
+                    let hue = Math.floor((time / 10 + t.x) % 360);
+                    leafColor = 'hsl(' + hue + ', 85%, 55%)';
+                }
+
+                ctx.fillStyle = leafColor;
+                if (t.type === 'pine') {
+                    ctx.beginPath();
+                    ctx.moveTo(t.x + 40 + sway, t.y - 15);
+                    ctx.lineTo(t.x + 5, t.y + 30);
+                    ctx.lineTo(t.x + 75, t.y + 30);
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(t.x + 40 + sway, t.y + 10);
+                    ctx.lineTo(t.x + 10, t.y + 50);
+                    ctx.lineTo(t.x + 70, t.y + 50);
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(t.x + 40 + sway, t.y + 10, 38, 0, Math.PI * 2); 
+                    ctx.arc(t.x + 15 + sway, t.y + 30, 30, 0, Math.PI * 2); 
+                    ctx.arc(t.x + 65 + sway, t.y + 30, 30, 0, Math.PI * 2); 
+                    ctx.fill();
+
+                    ctx.fillStyle = (t.type === 'majestic') ? 'hsl(' + Math.floor(((time / 10) + 180) % 360) + ', 90%, 70%)' : 'rgba(255,255,255,0.2)';
+                    ctx.beginPath();
+                    ctx.arc(t.x + 35 + sway, t.y + 5, 24, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                if (nearbyTrees.includes(t) && !player.choppingTarget) {
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+                    ctx.fillRect(t.x - 15, t.y - 35, 110, 26);
+                    ctx.strokeStyle = (t.type === 'majestic') ? leafColor : '#daa520';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(t.x - 15, t.y - 35, 110, 26);
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 11px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${tData.name} [SPACE]`, t.x + 40, t.y - 18);
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Pond Prompt
+        if (nearbyPond && nearbyTrees.length === 0 && !player.fishingTarget) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(nearbyPond.x - 45, nearbyPond.y - 20, 90, 26);
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(nearbyPond.x - 45, nearbyPond.y - 20, 90, 26);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Fish [SPACE]`, nearbyPond.x, nearbyPond.y - 3);
+            ctx.restore();
+        }
+
+        // Particles
+        for (let i = 0; i < particles.length; i++) {
+            let p = particles[i];
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 4, 4);
+        }
+
+        // Popups
+        for (let i = 0; i < popups.length; i++) {
+            let pop = popups[i];
+            ctx.save();
+            ctx.fillStyle = pop.color;
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(pop.text, pop.x + PLAYER_SIZE/2, pop.y);
+            ctx.restore();
+        }
+
+        // Player Model
+        let px = player.x;
+        let py = player.y;
+
+        ctx.fillStyle = '#1b365d';
+        ctx.fillRect(px + 10, py + 30, 8, 10);
+        ctx.fillRect(px + 22, py + 30, 8, 10);
+
+        ctx.fillStyle = '#b02323';
+        ctx.fillRect(px + 8, py + 16, 24, 14);
+        ctx.fillStyle = '#6b1111';
+        ctx.fillRect(px + 12, py + 16, 4, 14);
+        ctx.fillRect(px + 20, py + 16, 4, 14);
+        ctx.fillRect(px + 8, py + 20, 24, 4);
+
+        ctx.fillStyle = '#f5c6a5';
+        ctx.fillRect(px + 12, py + 2, 16, 14);
+        ctx.fillStyle = '#3a2212';
+        if (player.facing === 'up') { 
+            ctx.fillRect(px + 12, py + 2, 16, 14); 
+        } else {
+            ctx.fillRect(px + 12, py + 2, 16, 4); 
+            if (player.facing === 'down') {
+                ctx.fillRect(px + 12, py + 12, 16, 4); 
+                ctx.fillStyle = 'black'; 
+                ctx.fillRect(px + 15, py + 7, 3, 3); 
+                ctx.fillRect(px + 22, py + 7, 3, 3);
+            } else if (player.facing === 'left') {
+                ctx.fillRect(px + 12, py + 8, 6, 8); 
+                ctx.fillStyle = 'black'; 
+                ctx.fillRect(px + 14, py + 7, 3, 3); 
+            } else if (player.facing === 'right') {
+                ctx.fillRect(px + 22, py + 8, 6, 8); 
+                ctx.fillStyle = 'black'; 
+                ctx.fillRect(px + 23, py + 7, 3, 3); 
+            }
+        }
+
+        // Held Tool Visuals
+        if (player.fishingTarget) {
+            ctx.strokeStyle = '#d2b48c';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(px + 20, py + 20);
+            ctx.lineTo(player.fishingTarget.x, player.fishingTarget.y);
+            ctx.stroke();
+        } else {
+            if (player.facing === 'right' || player.facing === 'down') {
+                ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 28, py + 18, 4, 16);
+                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 30, py + 16, 8, 8);
+            } else if (player.facing === 'left' || player.facing === 'up') {
+                ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 8, py + 18, 4, 16);
+                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 2, py + 16, 8, 8);
+            }
+        }
+
+        // Progress Bar
+        if (player.choppingTarget || player.fishingTarget) {
+            let req = player.choppingTarget ? (BASE_CHOP_TIME / player.axe_damage) : (BASE_FISH_TIME / player.rod_level);
+            let prog = player.choppingTarget ? player.chopProgress : player.fishProgress;
+            let ratio = Math.min(1, prog / req);
+            let barColor = player.choppingTarget ? '#2ecc71' : '#3498db';
+
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(px - 10, py - 18, 60, 10);
+            ctx.fillStyle = barColor;
+            ctx.fillRect(px - 8, py - 16, 56 * ratio, 6);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px - 10, py - 18, 60, 10);
+        }
+
+        ctx.restore(); 
+
+        // HUD Inventory Panel
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(10, 10, 240, 250);
+        ctx.strokeStyle = '#daa520';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(10, 10, 240, 250);
+
+        ctx.fillStyle = '#daa520';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 30);
+
+        ctx.fillStyle = '#e67e22';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(`--- TIMBER ---`, 20, 50);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '11px Arial';
+        ctx.fillText(`🪵 Oak: ${player.inventory.oak || 0} | 🤍 Birch: ${player.inventory.birch || 0}`, 20, 68);
+        ctx.fillText(`🌲 Pine: ${player.inventory.pine || 0} | ⭐ Golden: ${player.inventory.golden || 0}`, 20, 84);
+        ctx.fillStyle = 'hsl(' + Math.floor((time/10)%360) + ', 100%, 70%)';
+        ctx.fillText(`🌈 Majestic: ${player.inventory.majestic || 0}`, 20, 100);
+
+        ctx.fillStyle = '#3498db';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(`--- FISHING TREASURES ---`, 20, 122);
+        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial';
+        ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed || 0}`, 20, 140);
+        ctx.fillStyle = '#3498db';
+        ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales || 0}`, 20, 156);
+        ctx.fillStyle = '#95a5a6';
+        ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth || 0}`, 20, 172);
+        ctx.fillStyle = '#9b59b6';
+        ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail || 0}`, 20, 188);
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold || 0}`, 20, 204);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '11px Arial';
+        ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
+        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🍀 Luck: +${(player.rod_luck * 100).toFixed(0)}%`, 20, 246);
+
+        // Merchant / Crafting Distance Prompts
+        let mDist = Math.sqrt(Math.pow((merchant.x+20) - (player.x+20), 2) + Math.pow((merchant.y+20) - (player.y+20), 2));
+        let cDist = Math.sqrt(Math.pow((craftingTable.x+20) - (player.x+20), 2) + Math.pow((craftingTable.y+20) - (player.y+20), 2));
+
+        if (mDist < 80) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Press [E] for Merchant Shop`, WIDTH / 2, HEIGHT - 40);
+            ctx.textAlign = 'left';
+        } else if (cDist < 80) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Press [E] for Crafting Table`, WIDTH / 2, HEIGHT - 40);
+            ctx.textAlign = 'left';
+        }
+    }
+
+    let lastTime = Date.now();
+    function gameLoop() {
+        try {
+            let now = Date.now();
+            let dt = now - lastTime;
+            lastTime = now;
+
+            update(dt);
+            draw();
+        } catch (e) {
+            console.error("Game loop error:", e);
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+});
+</script>
+</body>
+</html>
