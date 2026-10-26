@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Peer-to-Peer Multiplayer</title>
+<title>Stormblade - Cheatcode & Avatar Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -29,16 +29,17 @@
   }
   .mp-btn:hover { background: #daa520; color: #111; }
   #room-input {
-    width: 100px; padding: 5px; background: #222; color: white;
+    width: 90px; padding: 5px; background: #222; color: white;
     border: 1px solid #666; border-radius: 4px; text-align: center; font-weight: bold;
   }
 
   .modal-shop { 
     display: none; position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%); background: #222; 
-    border: 3px solid #daa520; padding: 20px; width: 440px; 
+    border: 3px solid #daa520; padding: 20px; width: 480px; 
     max-width: 90vw; text-align: center; color: white; 
     border-radius: 8px; box-shadow: 0 0 25px rgba(0,0,0,0.9); z-index: 10;
+    max-height: 85vh; overflow-y: auto;
   }
   .shop-btn { 
     display: block; margin: 8px auto; padding: 10px; 
@@ -49,6 +50,26 @@
   .shop-btn:hover { background: #daa520; color: #111; }
   .craft-btn { color: #2ecc71; border-color: #2ecc71; }
   .craft-btn:hover { background: #2ecc71; color: #111; }
+  .avatar-btn { color: #e74c3c; border-color: #e74c3c; }
+  .avatar-btn:hover { background: #e74c3c; color: #fff; }
+  .admin-btn { color: #9b59b6; border-color: #9b59b6; }
+  .admin-btn:hover { background: #9b59b6; color: #fff; }
+
+  /* Name Setter Modal */
+  #name-modal {
+    position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85); z-index: 20; display: flex;
+    justify-content: center; align-items: center; flex-direction: column;
+  }
+  #name-box {
+    background: #222; border: 3px solid #daa520; padding: 25px;
+    border-radius: 10px; text-align: center; color: white; width: 320px;
+  }
+  #username-input {
+    width: 100%; padding: 10px; margin: 15px 0; background: #111;
+    color: white; border: 1px solid #daa520; border-radius: 5px;
+    font-size: 16px; text-align: center; font-weight: bold; outline: none;
+  }
 
   /* Chat Box */
   #chat-container {
@@ -73,7 +94,17 @@
 <div id="game-container">
   <canvas id="gameCanvas"></canvas>
 
+  <!-- Initial Name Selection Window -->
+  <div id="name-modal">
+    <div id="name-box">
+      <h2 style="color: #daa520;">Enter Username</h2>
+      <input type="text" id="username-input" placeholder="Hero Name..." maxlength="12" autocomplete="off">
+      <button class="mp-btn" id="btn-save-name" style="width:100%; padding:10px;">Start Playing</button>
+    </div>
+  </div>
+
   <div id="multiplayer-bar">
+    <button class="mp-btn" id="btn-name-edit">Edit Name</button>
     <button class="mp-btn" id="btn-host">Host Room</button>
     <span style="color:#aaa;">OR</span>
     <input type="text" id="room-input" placeholder="CODE" maxlength="5">
@@ -87,10 +118,22 @@
   </div>
   
   <div id="shop" class="modal-shop">
-    <h2 style="color: #daa520; margin-bottom: 6px;">Wandering Merchant</h2>
+    <h2 style="color: #daa520; margin-bottom: 6px;">Merchant & Outfit Shop</h2>
     <button class="shop-btn" id="btn-sell">Sell All Timber Inventory [1]</button>
     <button class="shop-btn" id="btn-upgrade">Upgrade Axe Damage [2]</button>
-    <button class="shop-btn" id="btn-exit">Exit Shop [E]</button>
+    <hr style="border-color:#444; margin:10px 0;">
+    <h4 style="color: #e74c3c; margin-bottom: 6px;">Avatar Colors (100 Plat)</h4>
+    <button class="shop-btn avatar-btn" id="buy-color-ruby">Equip Ruby Outfit</button>
+    <button class="shop-btn avatar-btn" id="buy-color-cobalt">Equip Cobalt Outfit</button>
+    <button class="shop-btn avatar-btn" id="buy-color-emerald">Equip Emerald Outfit</button>
+    <button class="shop-btn avatar-btn" id="buy-color-obsidian">Equip Obsidian Outfit</button>
+    <button class="shop-btn avatar-btn" id="buy-color-gold" style="border-color:#f1c40f; color:#f1c40f;">Equip Pure Gold (250 Plat)</button>
+    <hr style="border-color:#444; margin:10px 0;">
+    <h4 style="color: #9b59b6; margin-bottom: 6px;">Hats & Accessories (150 Plat)</h4>
+    <button class="shop-btn avatar-btn" id="buy-hat-headband">Equip Hero Headband</button>
+    <button class="shop-btn avatar-btn" id="buy-hat-wizard">Equip Wizard Hat</button>
+    <button class="shop-btn avatar-btn" id="buy-hat-crown" style="border-color:#f1c40f; color:#f1c40f;">Equip King Crown (300 Plat)</button>
+    <button class="shop-btn" id="btn-exit" style="margin-top:10px;">Exit Shop [E]</button>
   </div>
 
   <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
@@ -102,6 +145,18 @@
     <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;">Timmah's Blessing +ALL STATS [5]</button>
     <button class="shop-btn" id="craft-exit" style="margin-top:8px;">Exit Crafting [E]</button>
   </div>
+
+  <!-- SECRET CHEAT / ADMIN PANEL -->
+  <div id="admin-panel" class="modal-shop" style="border-color: #9b59b6;">
+    <h2 style="color: #9b59b6; margin-bottom: 4px;">🧙‍♂️ Gandalf's Admin Panel</h2>
+    <p style="font-size: 11px; color:#aaa; margin-bottom:12px;">Cheat Code Activated!</p>
+    <button class="shop-btn admin-btn" id="adm-plat">+1,000 Platinum</button>
+    <button class="shop-btn admin-btn" id="adm-wood">+100 All Timber Types</button>
+    <button class="shop-btn admin-btn" id="adm-fish">+50 All Fishing Treasures</button>
+    <button class="shop-btn admin-btn" id="adm-stats">Max Speed & Axe Luck</button>
+    <button class="shop-btn admin-btn" id="adm-outfits">Unlock All Outfits & Hats</button>
+    <button class="shop-btn" id="adm-exit" style="margin-top:10px;">Close Panel [E]</button>
+  </div>
 </div>
 
 <script>
@@ -111,6 +166,9 @@ window.addEventListener('load', function() {
     const ctx = canvas.getContext('2d');
     const shopDiv = document.getElementById('shop');
     const craftDiv = document.getElementById('crafting');
+    const adminDiv = document.getElementById('admin-panel');
+    const nameModal = document.getElementById('name-modal');
+    const usernameInput = document.getElementById('username-input');
 
     let WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
     window.addEventListener('resize', () => {
@@ -119,7 +177,7 @@ window.addEventListener('load', function() {
     });
     canvas.width = WIDTH; canvas.height = HEIGHT;
 
-    const PLAYER_SIZE = 40, TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
+    const TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
     let inMenu = false, menuType = null, keys = {};
 
     const TREE_TYPES = {
@@ -148,81 +206,101 @@ window.addEventListener('load', function() {
     const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
 
     const player = {
+        name: "Hero",
         x: 0, y: 0, speed: 4, platinum: 0,
         inventory: { oak:0, birch:0, pine:0, golden:0, majestic:0 },
         fishLoot: { seaweed:0, fishScales:0, sharkTeeth:0, dolphinTail:0, timmahsGold:0 },
         axe_level: 1, axe_damage: 1, axe_range: 85, axe_multi: false, axe_luck: 0,
         rod_level: 1, facing: 'down',
+        bodyColor: '#b02323', hat: 'none', unlockedOutfits: ['#b02323'], unlockedHats: ['none'],
         choppingTarget: null, chopProgress: 0, fishingTarget: null, fishProgress: 0
     };
 
     let trees = [], ponds = [], particles = [], popups = [], chunksGenerated = {}, respawnQueue = [];
     const merchant = { x: 120, y: -80 }, craftingTable = { x: 240, y: -80 };
 
+    // --- 80s RETRO CHEAT CODE LISTENER ("gandalfthewhite") ---
+    const cheatCode = "gandalfthewhite";
+    let cheatBuffer = "";
+
+    window.addEventListener('keydown', function(e) {
+        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput) return;
+        
+        let char = e.key.toLowerCase();
+        if (char.length === 1 && char >= 'a' && char <= 'z') {
+            cheatBuffer += char;
+            if (cheatBuffer.length > cheatCode.length) {
+                cheatBuffer = cheatBuffer.substring(cheatBuffer.length - cheatCode.length);
+            }
+            if (cheatBuffer === cheatCode) {
+                cheatBuffer = "";
+                inMenu = true; menuType = 'admin'; adminDiv.style.display = 'block';
+                spawnPopUp("✨ YOU SHALL NOT PASS! (Admin Unlocked)", "#9b59b6", player.x, player.y - 45);
+            }
+        }
+    });
+
+    // --- USERNAME CONTROLS ---
+    document.getElementById('btn-save-name').onclick = function() {
+        let val = usernameInput.value.trim();
+        if (val !== "") player.name = val;
+        nameModal.style.display = 'none';
+        saveGame();
+    };
+    document.getElementById('btn-name-edit').onclick = function() {
+        usernameInput.value = player.name;
+        nameModal.style.display = 'flex';
+    };
+
     // --- PEERJS ROOM CODE SYSTEM ---
     let peer = null;
     let peerConnections = [];
     let otherPlayers = {};
-    const myId = "P_" + Math.floor(1000 + Math.random() * 9000);
     const roomStatus = document.getElementById('room-status');
 
     function addChatMessage(sender, text) {
         let box = document.getElementById('chat-messages');
         let el = document.createElement('div');
         el.className = 'chat-msg';
-        let color = sender === myId ? '#f1c40f' : (sender === 'System' ? '#2ecc71' : '#3498db');
+        let color = sender === player.name ? '#f1c40f' : (sender === 'System' ? '#2ecc71' : '#3498db');
         el.innerHTML = `<strong style="color:${color}">${sender}:</strong> ${text}`;
         box.appendChild(el);
         box.scrollTop = box.scrollHeight;
     }
 
-    addChatMessage("System", "Host a room or enter a code to play together!");
-
     function setupDataConnection(conn) {
         peerConnections.push(conn);
-
         conn.on('data', (data) => {
             if (data.type === 'move') {
-                otherPlayers[data.id] = { x: data.x, y: data.y, facing: data.facing, lastSeen: Date.now() };
+                otherPlayers[data.id] = { 
+                    name: data.name, x: data.x, y: data.y, facing: data.facing, 
+                    bodyColor: data.bodyColor, hat: data.hat, lastSeen: Date.now() 
+                };
             } else if (data.type === 'chat') {
-                addChatMessage(data.id, data.text);
+                addChatMessage(data.name, data.text);
                 if (otherPlayers[data.id]) {
                     spawnPopUp(data.text, "#ffffff", otherPlayers[data.id].x, otherPlayers[data.id].y - 35);
                 }
             }
         });
-
-        conn.on('close', () => {
-            peerConnections = peerConnections.filter(c => c !== conn);
-        });
+        conn.on('close', () => { peerConnections = peerConnections.filter(c => c !== conn); });
     }
 
-    // Host Room Button
     document.getElementById('btn-host').onclick = function() {
         let code = Math.floor(1000 + Math.random() * 9000).toString();
         peer = new Peer("sb-room-" + code);
-        
-        peer.on('open', (id) => {
+        peer.on('open', () => {
             roomStatus.innerText = "ROOM CODE: " + code;
             addChatMessage("System", "Room active! Give your friend code: " + code);
             spawnPopUp("Room Code: " + code, "#f1c40f", player.x, player.y - 45);
         });
-
-        peer.on('connection', (conn) => {
-            setupDataConnection(conn);
-            addChatMessage("System", "Friend connected!");
-        });
-
-        peer.on('error', (err) => {
-            roomStatus.innerText = "Error hosting. Try again.";
-        });
+        peer.on('connection', (conn) => { setupDataConnection(conn); addChatMessage("System", "Friend connected!"); });
+        peer.on('error', () => { roomStatus.innerText = "Error hosting. Try again."; });
     };
 
-    // Join Room Button
     document.getElementById('btn-join').onclick = function() {
         let code = document.getElementById('room-input').value.trim();
         if (code.length < 4) return;
-        
         peer = new Peer();
         peer.on('open', () => {
             let conn = peer.connect("sb-room-" + code);
@@ -232,9 +310,7 @@ window.addEventListener('load', function() {
                 addChatMessage("System", "Joined Room " + code);
                 spawnPopUp("Connected to Host!", "#2ecc71", player.x, player.y - 45);
             });
-            conn.on('error', () => {
-                roomStatus.innerText = "Room not found!";
-            });
+            conn.on('error', () => { roomStatus.innerText = "Room not found!"; });
         });
     };
 
@@ -242,7 +318,11 @@ window.addEventListener('load', function() {
     function broadcastPosition() {
         let now = Date.now();
         if (now - lastSendTime > 50 && peerConnections.length > 0) {
-            let packet = { type: 'move', id: myId, x: Math.round(player.x), y: Math.round(player.y), facing: player.facing };
+            let packet = { 
+                type: 'move', id: peer.id, name: player.name, 
+                x: Math.round(player.x), y: Math.round(player.y), facing: player.facing,
+                bodyColor: player.bodyColor, hat: player.hat
+            };
             peerConnections.forEach(c => { if(c.open) c.send(packet); });
             lastSendTime = now;
         }
@@ -256,10 +336,10 @@ window.addEventListener('load', function() {
             let txt = chatInput.value.trim();
             if (txt !== '') {
                 if (peerConnections.length > 0) {
-                    let packet = { type: 'chat', id: myId, text: txt };
+                    let packet = { type: 'chat', id: peer ? peer.id : 'self', name: player.name, text: txt };
                     peerConnections.forEach(c => { if(c.open) c.send(packet); });
                 }
-                addChatMessage(myId, txt);
+                addChatMessage(player.name, txt);
                 spawnPopUp(txt, "#ffffff", player.x, player.y - 35);
             }
             chatInput.value = ''; chatInput.blur();
@@ -270,10 +350,11 @@ window.addEventListener('load', function() {
     function saveGame() {
         try {
             localStorage.setItem('stormblade_save', JSON.stringify({
-                x: player.x, y: player.y, speed: player.speed, platinum: player.platinum,
+                name: player.name, x: player.x, y: player.y, speed: player.speed, platinum: player.platinum,
                 inventory: player.inventory, fishLoot: player.fishLoot,
                 axe_level: player.axe_level, axe_damage: player.axe_damage, axe_range: player.axe_range,
-                axe_multi: player.axe_multi, axe_luck: player.axe_luck, rod_level: player.rod_level
+                axe_multi: player.axe_multi, axe_luck: player.axe_luck, rod_level: player.rod_level,
+                bodyColor: player.bodyColor, hat: player.hat, unlockedOutfits: player.unlockedOutfits, unlockedHats: player.unlockedHats
             }));
             spawnPopUp("💾 Game Saved!", "#f1c40f", player.x, player.y - 45);
         } catch(e) {}
@@ -285,6 +366,7 @@ window.addEventListener('load', function() {
             if (str) {
                 let d = JSON.parse(str);
                 Object.assign(player, d);
+                if (d.name) nameModal.style.display = 'none';
             }
         } catch(e) {}
     }
@@ -332,16 +414,16 @@ window.addEventListener('load', function() {
     }
 
     window.addEventListener('keydown', function(e) {
-        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input')) return;
+        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput) return;
         if (e.key === 'Enter') { chatInput.focus(); return; }
 
         keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
         
         if (inMenu) {
             let ui = menuType === 'shop' ? ['btn-sell','btn-upgrade'] : ['craft-rod','craft-speed','craft-luck','craft-hitbox','craft-timmah'];
-            let exitBtn = menuType === 'shop' ? 'btn-exit' : 'craft-exit';
+            let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : 'adm-exit');
             let num = parseInt(e.key);
-            if (num > 0 && num <= ui.length) document.getElementById(ui[num-1]).click();
+            if (menuType !== 'admin' && num > 0 && num <= ui.length) document.getElementById(ui[num-1]).click();
             if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById(exitBtn).click();
             return; 
         }
@@ -378,9 +460,60 @@ window.addEventListener('load', function() {
             player.platinum -= player.axe_level * 50; player.axe_level++; player.axe_damage++; updateUIs(); saveGame();
         }
     };
-    const exitShop = () => { inMenu = false; menuType = null; shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; };
-    document.getElementById('btn-exit').onclick = exitShop; document.getElementById('craft-exit').onclick = exitShop;
+    const exitShop = () => { inMenu = false; menuType = null; shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; adminDiv.style.display = 'none'; };
+    document.getElementById('btn-exit').onclick = exitShop; 
+    document.getElementById('craft-exit').onclick = exitShop;
+    document.getElementById('adm-exit').onclick = exitShop;
 
+    // --- ADMIN CHEAT BUTTONS ---
+    document.getElementById('adm-plat').onclick = () => { player.platinum += 1000; spawnPopUp("+1000 Platinum!", "#9b59b6", player.x, player.y-40); saveGame(); };
+    document.getElementById('adm-wood').onclick = () => { 
+        for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+100; 
+        spawnPopUp("+100 All Timber!", "#2ecc71", player.x, player.y-40); saveGame(); 
+    };
+    document.getElementById('adm-fish').onclick = () => { 
+        for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+50; 
+        spawnPopUp("+50 All Treasures!", "#3498db", player.x, player.y-40); saveGame(); 
+    };
+    document.getElementById('adm-stats').onclick = () => { 
+        player.speed += 3.0; player.axe_luck += 5.0; player.axe_damage += 5;
+        spawnPopUp("GOD STATS ACTIVATED!", "#f1c40f", player.x, player.y-40); saveGame(); 
+    };
+    document.getElementById('adm-outfits').onclick = () => { 
+        player.unlockedOutfits = ['#b02323','#c0392b','#2980b9','#27ae60','#2c3e50','#f1c40f'];
+        player.unlockedHats = ['none','headband','wizard','crown'];
+        spawnPopUp("Unlocked All Cosmetics!", "#e74c3c", player.x, player.y-40); saveGame(); 
+    };
+
+    // AVATAR SHOP PURCHASES
+    function buyOutfit(color, cost) {
+        if (player.unlockedOutfits.includes(color)) {
+            player.bodyColor = color; spawnPopUp("Equipped Outfit!", "#3498db", player.x, player.y-40); broadcastPosition(); saveGame();
+        } else if (player.platinum >= cost) {
+            player.platinum -= cost; player.unlockedOutfits.push(color); player.bodyColor = color;
+            spawnPopUp("Purchased Outfit!", "#2ecc71", player.x, player.y-40); broadcastPosition(); saveGame();
+        }
+    }
+    function buyHat(hatType, cost) {
+        if (player.unlockedHats.includes(hatType)) {
+            player.hat = hatType; spawnPopUp("Equipped Hat!", "#9b59b6", player.x, player.y-40); broadcastPosition(); saveGame();
+        } else if (player.platinum >= cost) {
+            player.platinum -= cost; player.unlockedHats.push(hatType); player.hat = hatType;
+            spawnPopUp("Purchased Hat!", "#f1c40f", player.x, player.y-40); broadcastPosition(); saveGame();
+        }
+    }
+
+    document.getElementById('buy-color-ruby').onclick = () => buyOutfit('#c0392b', 100);
+    document.getElementById('buy-color-cobalt').onclick = () => buyOutfit('#2980b9', 100);
+    document.getElementById('buy-color-emerald').onclick = () => buyOutfit('#27ae60', 100);
+    document.getElementById('buy-color-obsidian').onclick = () => buyOutfit('#2c3e50', 100);
+    document.getElementById('buy-color-gold').onclick = () => buyOutfit('#f1c40f', 250);
+
+    document.getElementById('buy-hat-headband').onclick = () => buyHat('headband', 150);
+    document.getElementById('buy-hat-wizard').onclick = () => buyHat('wizard', 150);
+    document.getElementById('buy-hat-crown').onclick = () => buyHat('crown', 300);
+
+    // CRAFTING LOGIC
     document.getElementById('craft-rod').onclick = function() {
         if (player.fishLoot.seaweed >= 10) { player.fishLoot.seaweed -= 10; player.rod_level++; spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y-40); updateUIs(); saveGame(); }
     };
@@ -401,7 +534,7 @@ window.addEventListener('load', function() {
     };
 
     function update(dt) {
-        if (!inMenu) {
+        if (!inMenu && nameModal.style.display !== 'flex') {
             let dx = 0, dy = 0, moved = false;
             if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
             if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; moved=true; }
@@ -488,7 +621,7 @@ window.addEventListener('load', function() {
         }
     }
 
-    function drawModel(x, y, facing, color='#b02323') {
+    function drawModel(x, y, facing, color='#b02323', hat='none') {
         ctx.fillStyle = '#1b365d'; ctx.fillRect(x+10, y+30, 8, 10); ctx.fillRect(x+22, y+30, 8, 10);
         ctx.fillStyle = color; ctx.fillRect(x+8, y+16, 24, 14);
         ctx.fillStyle = '#6b1111'; ctx.fillRect(x+12, y+16, 4, 14); ctx.fillRect(x+20, y+16, 4, 14);
@@ -501,6 +634,19 @@ window.addEventListener('load', function() {
             if (facing === 'down') { ctx.fillStyle='black'; ctx.fillRect(x+15, y+7, 3,3); ctx.fillRect(x+22, y+7, 3,3); }
             else if (facing === 'left') { ctx.fillStyle='black'; ctx.fillRect(x+14, y+7, 3,3); }
             else if (facing === 'right') { ctx.fillStyle='black'; ctx.fillRect(x+23, y+7, 3,3); }
+        }
+
+        // Render Accessories & Hats
+        if (hat === 'headband') {
+            ctx.fillStyle = '#e74c3c'; ctx.fillRect(x+10, y+3, 20, 3);
+        } else if (hat === 'wizard') {
+            ctx.fillStyle = '#8e44ad';
+            ctx.beginPath(); ctx.moveTo(x+20, y-10); ctx.lineTo(x+8, y+2); ctx.lineTo(x+32, y+2); ctx.fill();
+            ctx.fillStyle = '#f1c40f'; ctx.fillRect(x+8, y+1, 24, 2);
+        } else if (hat === 'crown') {
+            ctx.fillStyle = '#f1c40f';
+            ctx.fillRect(x+10, y-2, 20, 5);
+            ctx.beginPath(); ctx.moveTo(x+10, y-2); ctx.lineTo(x+10, y-7); ctx.lineTo(x+15, y-2); ctx.lineTo(x+20, y-8); ctx.lineTo(x+25, y-2); ctx.lineTo(x+30, y-7); ctx.lineTo(x+30, y-2); ctx.fill();
         }
     }
 
@@ -523,7 +669,7 @@ window.addEventListener('load', function() {
         // Merchant
         ctx.fillStyle='#781d1d'; ctx.fillRect(merchant.x-20, merchant.y-10, 80, 60);
         ctx.fillStyle='#f1c40f'; ctx.fillRect(merchant.x-20, merchant.y-10, 80, 4); ctx.fillRect(merchant.x-20, merchant.y+46, 80, 4);
-        drawModel(merchant.x-4, merchant.y-10, 'down', '#e74c3c'); 
+        drawModel(merchant.x-4, merchant.y-10, 'down', '#e74c3c', 'wizard'); 
         
         // Crafting
         ctx.fillStyle='#5c3a21'; ctx.fillRect(craftingTable.x-10, craftingTable.y-5, 60, 50);
@@ -554,15 +700,15 @@ window.addEventListener('load', function() {
         for (let pid in otherPlayers) {
             let op = otherPlayers[pid];
             if (time - op.lastSeen > 8000) { delete otherPlayers[pid]; continue; }
-            drawModel(op.x, op.y, op.facing, '#2980b9');
+            drawModel(op.x, op.y, op.facing, op.bodyColor || '#2980b9', op.hat || 'none');
             ctx.fillStyle = '#3498db'; ctx.font = 'bold 11px Arial'; ctx.textAlign='center';
-            ctx.fillText(pid, op.x+20, op.y-6);
+            ctx.fillText(op.name || "Player", op.x+20, op.y-12);
         }
 
-        // Self
-        drawModel(player.x, player.y, player.facing, '#b02323');
+        // Self Character
+        drawModel(player.x, player.y, player.facing, player.bodyColor, player.hat);
         ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 11px Arial'; ctx.textAlign='center'; 
-        ctx.fillText(myId + " (You)", player.x+20, player.y-6);
+        ctx.fillText(player.name + " (You)", player.x+20, player.y-12);
 
         // Tool Visuals
         if (player.fishingTarget) {
@@ -578,9 +724,9 @@ window.addEventListener('load', function() {
         if (player.choppingTarget || player.fishingTarget) {
             let req = player.choppingTarget ? (10000 / player.axe_damage) : (6000 / player.rod_level);
             let prog = player.choppingTarget ? player.chopProgress : player.fishProgress;
-            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x-10, player.y-18, 60, 10);
+            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(player.x-10, player.y-22, 60, 10);
             ctx.fillStyle = player.choppingTarget ? '#2ecc71' : '#3498db';
-            ctx.fillRect(player.x-8, player.y-16, 56 * Math.min(1, prog/req), 6);
+            ctx.fillRect(player.x-8, player.y-20, 56 * Math.min(1, prog/req), 6);
         }
 
         particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4); });
