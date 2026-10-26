@@ -35,7 +35,7 @@
     background: #222222; 
     border: 3px solid #daa520; 
     padding: 25px; 
-    width: 360px; 
+    width: 380px; 
     text-align: center; 
     color: white; 
     border-radius: 8px; 
@@ -43,14 +43,14 @@
   }
   .shop-btn { 
     display: block; 
-    margin: 12px auto; 
+    margin: 10px auto; 
     padding: 12px; 
     background: #333333; 
     color: #daa520; 
     border: 1px solid #daa520; 
     cursor: pointer; 
-    width: 90%; 
-    font-size: 15px; 
+    width: 95%; 
+    font-size: 14px; 
     font-weight: bold;
     border-radius: 4px;
   }
@@ -65,9 +65,9 @@
 <div id="game-container">
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   <div id="shop">
-    <h2 style="color: #daa520; margin-bottom: 10px;">Wandering Merchant</h2>
-    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 15px;">"Trade your timber for fine platinum!"</p>
-    <button class="shop-btn" id="btn-sell">Sell Wood (+5 Plat/ea) [1]</button>
+    <h2 style="color: #daa520; margin-bottom: 8px;">Wandering Merchant</h2>
+    <p style="font-style: italic; color: #aaaaaa; margin-bottom: 12px;">"I trade platinum for all timber types!"</p>
+    <button class="shop-btn" id="btn-sell">Sell All Timber Inventory [1]</button>
     <button class="shop-btn" id="btn-upgrade">Upgrade Axe [2]</button>
     <button class="shop-btn" id="btn-exit">Exit Shop [E]</button>
   </div>
@@ -85,10 +85,19 @@ window.addEventListener('load', function() {
     const WIDTH = 800, HEIGHT = 600;
     const CHUNK_SIZE = 800;
     const RESPAWN_TIME = 25000;
-    const BASE_CHOP_TIME = 10000; // 10 Seconds for Axe Lvl 1
+    const BASE_CHOP_TIME = 10000; // 10s Base for Axe Lvl 1
 
     let inShop = false;
     let keys = {};
+
+    // Tree Types Configuration
+    const TREE_TYPES = {
+        oak:      { name: "Oak",      color: "#274e13", trunk: "#4a2e16", val: 5,  weight: 55 },
+        birch:    { name: "Birch",    color: "#80a832", trunk: "#e0e0e0", val: 7,  weight: 22 },
+        pine:     { name: "Pine",     color: "#0f381e", trunk: "#3d220f", val: 10, weight: 12 },
+        golden:   { name: "Golden",   color: "#f39c12", trunk: "#6e4213", val: 15, weight: 7  },
+        majestic: { name: "Majestic", color: "rainbow", trunk: "#2c3e50", val: 25, weight: 4  }
+    };
 
     // Procedural grass texture
     const grassCanvas = document.createElement('canvas');
@@ -106,7 +115,8 @@ window.addEventListener('load', function() {
     // Player State
     const player = {
         x: 0, y: 0, 
-        speed: 4, wood: 0, platinum: 0,
+        speed: 4, platinum: 0,
+        inventory: { oak: 0, birch: 0, pine: 0, golden: 0, majestic: 0 },
         axe_level: 1, axe_damage: 1,
         facing: 'down',
         choppingTarget: null,
@@ -121,6 +131,16 @@ window.addEventListener('load', function() {
     let respawnQueue = [];
     let screenShake = 0;
 
+    function getRandomTreeType() {
+        let rand = Math.random() * 100;
+        let cumulative = 0;
+        for (let key in TREE_TYPES) {
+            cumulative += TREE_TYPES[key].weight;
+            if (rand <= cumulative) return key;
+        }
+        return 'oak';
+    }
+
     function generateChunk(cx, cy) {
         let key = cx + '_' + cy;
         if (chunksGenerated[key]) return;
@@ -134,7 +154,7 @@ window.addEventListener('load', function() {
             let distToMerchant = Math.sqrt(Math.pow(tx - merchant.x, 2) + Math.pow(ty - merchant.y, 2));
             if (distToMerchant < 160) continue; 
             
-            trees.push({ id: Math.random(), x: tx, y: ty });
+            trees.push({ id: Math.random(), type: getRandomTreeType(), x: tx, y: ty });
         }
     }
 
@@ -149,19 +169,23 @@ window.addEventListener('load', function() {
         }
     }
 
-    function spawnWoodChips(x, y) {
+    function spawnWoodChips(x, y, treeType) {
+        let chipColor = TREE_TYPES[treeType].trunk;
+        if (treeType === 'majestic') chipColor = `hsl(${Math.random() * 360}, 100%, 60%)`;
+        else if (treeType === 'golden') chipColor = '#f1c40f';
+
         for (let i = 0; i < 4; i++) {
             particles.push({
                 x: x, y: y,
-                vx: (Math.random() - 0.5) * 4,
-                vy: (Math.random() - 0.5) * 4,
-                life: 15,
-                color: Math.random() > 0.5 ? '#8b5a2b' : '#d2b48c'
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5,
+                life: 18,
+                color: chipColor
             });
         }
     }
 
-    // Input Handling
+    // Input Listeners
     window.addEventListener('keydown', function(e) {
         keys[e.key.toLowerCase()] = true;
         keys[e.code] = true; 
@@ -191,12 +215,16 @@ window.addEventListener('load', function() {
     function updateShopUI() {
         document.getElementById('btn-upgrade').innerText = `Upgrade Axe (${player.axe_level * 50} Plat) [2]`;
     }
+
     document.getElementById('btn-sell').onclick = function() {
-        if (player.wood > 0) {
-            player.platinum += player.wood * 5;
-            player.wood = 0;
+        let earned = 0;
+        for (let type in player.inventory) {
+            earned += player.inventory[type] * TREE_TYPES[type].val;
+            player.inventory[type] = 0;
         }
+        player.platinum += earned;
     };
+
     document.getElementById('btn-upgrade').onclick = function() {
         let cost = player.axe_level * 50;
         if (player.platinum >= cost) {
@@ -206,6 +234,7 @@ window.addEventListener('load', function() {
             updateShopUI();
         }
     };
+
     document.getElementById('btn-exit').onclick = function() {
         inShop = false;
         shopDiv.style.display = 'none';
@@ -221,9 +250,7 @@ window.addEventListener('load', function() {
             let tCenterY = t.y + TREE_SIZE / 2;
             
             let dist = Math.sqrt(Math.pow(pCenterX - tCenterX, 2) + Math.pow(pCenterY - tCenterY, 2));
-            if (dist < 85) { // Hitbox range
-                return t;
-            }
+            if (dist < 85) return t;
         }
         return null;
     }
@@ -233,295 +260,4 @@ window.addEventListener('load', function() {
             let dx = 0, dy = 0;
             if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
             if (keys['s'] || keys['arrowdown']) { dy += player.speed; player.facing = 'down'; }
-            if (keys['a'] || keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; }
-            if (keys['d'] || keys['arrowright']) { dx += player.speed; player.facing = 'right'; }
-
-            if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-
-            player.x += dx;
-            player.y += dy;
-            
-            updateWorldChunks();
-        }
-
-        // Tree Chopping Logic (Hold Spacebar)
-        let targetTree = getNearbyTree();
-        if ((keys['Space'] || keys['space']) && targetTree && !inShop) {
-            if (player.choppingTarget !== targetTree) {
-                player.choppingTarget = targetTree;
-                player.chopProgress = 0;
-            }
-
-            let requiredTime = BASE_CHOP_TIME / player.axe_damage;
-            player.chopProgress += dt;
-
-            if (Math.random() < 0.3) {
-                spawnWoodChips(targetTree.x + TREE_SIZE / 2, targetTree.y + TREE_SIZE / 2);
-            }
-
-            if (player.chopProgress >= requiredTime) {
-                for (let i = 0; i < trees.length; i++) {
-                    if (trees[i] === targetTree) {
-                        respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
-                        trees.splice(i, 1);
-                        break;
-                    }
-                }
-                player.wood += Math.floor(Math.random() * 5) + 4;
-                player.choppingTarget = null;
-                player.chopProgress = 0;
-                screenShake = 10;
-            }
-        } else {
-            player.choppingTarget = null;
-            player.chopProgress = 0;
-        }
-
-        // Tree Respawning
-        let now = Date.now();
-        for (let i = respawnQueue.length - 1; i >= 0; i--) {
-            if (now - respawnQueue[i].time >= RESPAWN_TIME) {
-                trees.push({id: Math.random(), x: respawnQueue[i].x, y: respawnQueue[i].y});
-                respawnQueue.splice(i, 1);
-            }
-        }
-
-        // Wood Chips Particle Updates
-        for (let i = particles.length - 1; i >= 0; i--) {
-            let p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life--;
-            if (p.life <= 0) particles.splice(i, 1);
-        }
-
-        if (screenShake > 0) screenShake--;
-    }
-
-    function draw() {
-        let camX = WIDTH / 2 - player.x - PLAYER_SIZE / 2;
-        let camY = HEIGHT / 2 - player.y - PLAYER_SIZE / 2;
-
-        if (screenShake > 0) {
-            camX += (Math.random() - 0.5) * 6;
-            camY += (Math.random() - 0.5) * 6;
-        }
-
-        // Ground Grass
-        ctx.fillStyle = grassPattern || '#3b5e2b';
-        ctx.save(); 
-        ctx.translate(camX % 64, camY % 64); 
-        ctx.fillRect(-64, -64, WIDTH + 128, HEIGHT + 128);
-        ctx.restore();
-
-        // Camera Offset Matrix
-        ctx.save();
-        ctx.translate(camX, camY);
-
-        // Merchant Carpet
-        ctx.fillStyle = '#781d1d';
-        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 60);
-        ctx.fillStyle = '#f1c40f'; 
-        ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 4);
-        ctx.fillRect(merchant.x - 20, merchant.y + 46, 80, 4);
-
-        // Merchant Sprite
-        ctx.fillStyle = '#4a2e16';
-        ctx.fillRect(merchant.x + 8, merchant.y + 8, 24, 26);
-        ctx.fillStyle = '#f5c6a5';
-        ctx.fillRect(merchant.x + 12, merchant.y - 2, 16, 12);
-        ctx.fillStyle = '#ecf0f1';
-        ctx.fillRect(merchant.x + 10, merchant.y + 8, 20, 16);
-        ctx.fillStyle = '#2c3e50';
-        ctx.fillRect(merchant.x + 8, merchant.y - 8, 24, 8);
-        ctx.fillStyle = 'black';
-        ctx.fillRect(merchant.x + 14, merchant.y + 2, 3, 3);
-        ctx.fillRect(merchant.x + 23, merchant.y + 2, 3, 3);
-
-        // Render Trees
-        let time = Date.now();
-        let nearbyTree = getNearbyTree();
-
-        for (let i = 0; i < trees.length; i++) {
-            let t = trees[i];
-            if (t.x > player.x - 600 && t.x < player.x + 600 && t.y > player.y - 500 && t.y < player.y + 500) {
-                let sway = Math.sin((time / 350) + t.x) * 4; 
-                
-                // Shadow
-                ctx.fillStyle = 'rgba(0,0,0,0.25)';
-                ctx.beginPath();
-                ctx.arc(t.x + TREE_SIZE/2, t.y + TREE_SIZE - 5, 30, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Trunk
-                ctx.fillStyle = '#4a2e16'; 
-                ctx.fillRect(t.x + 28, t.y + 35, 24, 45);
-                
-                // Canopy Circles
-                ctx.fillStyle = '#1e3d0f'; 
-                ctx.beginPath();
-                ctx.arc(t.x + 40 + sway, t.y + 10, 38, 0, Math.PI * 2); 
-                ctx.arc(t.x + 15 + sway, t.y + 30, 30, 0, Math.PI * 2); 
-                ctx.arc(t.x + 65 + sway, t.y + 30, 30, 0, Math.PI * 2); 
-                ctx.fill();
-
-                ctx.fillStyle = '#2d5718'; 
-                ctx.beginPath();
-                ctx.arc(t.x + 35 + sway, t.y + 5, 26, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Draw Interact Prompt Box
-                if (t === nearbyTree && !player.choppingTarget) {
-                    ctx.save();
-                    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-                    ctx.fillRect(t.x - 5, t.y - 30, 90, 24);
-                    ctx.strokeStyle = '#daa520';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(t.x - 5, t.y - 30, 90, 24);
-
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 11px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('Interact [SPACE]', t.x + 40, t.y - 14);
-                    ctx.restore();
-                }
-            }
-        }
-
-        // Draw Particles
-        for (let i = 0; i < particles.length; i++) {
-            let p = particles[i];
-            ctx.fillStyle = p.color;
-            ctx.fillRect(p.x, p.y, 4, 4);
-        }
-
-        // Player Model
-        let px = player.x;
-        let py = player.y;
-
-        ctx.fillStyle = '#1b365d';
-        ctx.fillRect(px + 10, py + 30, 8, 10);
-        ctx.fillRect(px + 22, py + 30, 8, 10);
-
-        ctx.fillStyle = '#b02323';
-        ctx.fillRect(px + 8, py + 16, 24, 14);
-        ctx.fillStyle = '#6b1111';
-        ctx.fillRect(px + 12, py + 16, 4, 14);
-        ctx.fillRect(px + 20, py + 16, 4, 14);
-        ctx.fillRect(px + 8, py + 20, 24, 4);
-
-        ctx.fillStyle = '#f5c6a5';
-        ctx.fillRect(px + 12, py + 2, 16, 14);
-        ctx.fillStyle = '#3a2212';
-        if (player.facing === 'up') { 
-            ctx.fillRect(px + 12, py + 2, 16, 14); 
-        } else {
-            ctx.fillRect(px + 12, py + 2, 16, 4); 
-            if (player.facing === 'down') {
-                ctx.fillRect(px + 12, py + 12, 16, 4); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 15, py + 7, 3, 3); 
-                ctx.fillRect(px + 22, py + 7, 3, 3);
-            } else if (player.facing === 'left') {
-                ctx.fillRect(px + 12, py + 8, 6, 8); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 14, py + 7, 3, 3); 
-            } else if (player.facing === 'right') {
-                ctx.fillRect(px + 22, py + 8, 6, 8); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 23, py + 7, 3, 3); 
-            }
-        }
-
-        if (player.facing === 'right' || player.facing === 'down') {
-            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 28, py + 18, 4, 16);
-            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 30, py + 16, 8, 8);
-        } else if (player.facing === 'left' || player.facing === 'up') {
-            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 8, py + 18, 4, 16);
-            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 2, py + 16, 8, 8);
-        }
-
-        // Progress Bar above Player
-        if (player.choppingTarget) {
-            let requiredTime = BASE_CHOP_TIME / player.axe_damage;
-            let ratio = Math.min(1, player.chopProgress / requiredTime);
-
-            ctx.fillStyle = 'rgba(0,0,0,0.8)';
-            ctx.fillRect(px - 10, py - 18, 60, 10);
-            ctx.fillStyle = '#2ecc71';
-            ctx.fillRect(px - 8, py - 16, 56 * ratio, 6);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px - 10, py - 18, 60, 10);
-        }
-
-        ctx.restore(); 
-
-        // HUD Box
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.fillRect(10, 10, 210, 110);
-        ctx.strokeStyle = '#daa520';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(10, 10, 210, 110);
-
-        ctx.fillStyle = '#e67e22';
-        ctx.font = 'bold 16px Arial';
-        ctx.fillText(`Wood: ${player.wood}`, 25, 38);
-        
-        ctx.fillStyle = '#e5e4e2';
-        ctx.fillText(`Platinum: ${player.platinum}`, 25, 68);
-        
-        ctx.fillStyle = '#3498db';
-        ctx.fillText(`Axe Lvl: ${player.axe_level} (${(10 / player.axe_damage).toFixed(1)}s chop)`, 25, 98);
-
-        // Compass pointing to Merchant
-        let dxM = (merchant.x + 20) - (player.x + 20);
-        let dyM = (merchant.y + 20) - (player.y + 20);
-        let angle = Math.atan2(dyM, dxM);
-        let dist = Math.sqrt(dxM * dxM + dyM * dyM);
-        
-        if (dist > 250) { 
-            ctx.save();
-            ctx.translate(WIDTH / 2, 35); 
-            ctx.rotate(angle);
-            
-            ctx.fillStyle = '#e74c3c';
-            ctx.beginPath();
-            ctx.moveTo(14, 0);
-            ctx.lineTo(-10, -8);
-            ctx.lineTo(-4, 0);
-            ctx.lineTo(-10, 8);
-            ctx.fill();
-            
-            ctx.restore();
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '13px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Merchant: ${Math.floor(dist/10)}m`, WIDTH / 2, 58);
-            ctx.textAlign = 'left'; 
-        } else if (dist < 80) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Press [E] to Shop`, WIDTH / 2, HEIGHT - 40);
-            ctx.textAlign = 'left';
-        }
-    }
-
-    let lastTime = Date.now();
-    function gameLoop() {
-        let now = Date.now();
-        let dt = now - lastTime;
-        lastTime = now;
-
-        update(dt);
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
-
-    gameLoop();
-});
-</script>
-</body>
-</html>
+            if (keys['a'] || keys['arrowleft']) { dx -= player.speed
