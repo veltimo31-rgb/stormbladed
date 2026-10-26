@@ -80,15 +80,17 @@ window.addEventListener('load', function() {
     const ctx = canvas.getContext('2d');
     const shopDiv = document.getElementById('shop');
 
-    const TILE_SIZE = 40;
+    const PLAYER_SIZE = 40;
+    const TREE_SIZE = 80; // Scaled up tree size
     const WIDTH = 800, HEIGHT = 600;
-    const CHUNK_SIZE = 600;
-    const RESPAWN_TIME = 20000;
+    const CHUNK_SIZE = 800;
+    const RESPAWN_TIME = 25000;
+    const BASE_CHOP_TIME = 10000; // 10 Seconds for Axe Level 1
 
     let inShop = false;
     let keys = {};
 
-    // Generate procedural grass texture
+    // Procedural grass texture
     const grassCanvas = document.createElement('canvas');
     grassCanvas.width = 64; 
     grassCanvas.height = 64;
@@ -101,34 +103,38 @@ window.addEventListener('load', function() {
     }
     const grassPattern = ctx.createPattern(grassCanvas, 'repeat');
 
-    // Entities & World
+    // Player State
     const player = {
         x: 0, y: 0, 
         speed: 4, wood: 0, platinum: 0,
         axe_level: 1, axe_damage: 1,
-        facing: 'down'
+        facing: 'down',
+        choppingTarget: null,
+        chopProgress: 0
     };
 
     const merchant = { x: 120, y: -80 }; 
 
     let trees = [];
+    let particles = [];
     let chunksGenerated = {};
     let respawnQueue = [];
+    let screenShake = 0;
 
     function generateChunk(cx, cy) {
         let key = cx + '_' + cy;
         if (chunksGenerated[key]) return;
         chunksGenerated[key] = true;
 
-        let treeCount = Math.floor(Math.random() * 8) + 6; 
+        let treeCount = Math.floor(Math.random() * 6) + 5; 
         for (let i = 0; i < treeCount; i++) {
-            let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
-            let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TILE_SIZE);
+            let tx = cx * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
+            let ty = cy * CHUNK_SIZE + Math.random() * (CHUNK_SIZE - TREE_SIZE);
             
             let distToMerchant = Math.sqrt(Math.pow(tx - merchant.x, 2) + Math.pow(ty - merchant.y, 2));
-            if (distToMerchant < 120) continue; 
+            if (distToMerchant < 160) continue; 
             
-            trees.push({ x: tx, y: ty, health: 3 });
+            trees.push({ id: Math.random(), x: tx, y: ty });
         }
     }
 
@@ -143,7 +149,19 @@ window.addEventListener('load', function() {
         }
     }
 
-    // Controls
+    function spawnWoodChips(x, y) {
+        for (let i = 0; i < 4; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                life: 15,
+                color: Math.random() > 0.5 ? '#8b5a2b' : '#d2b48c'
+            });
+        }
+    }
+
+    // Input Listeners
     window.addEventListener('keydown', function(e) {
         keys[e.key.toLowerCase()] = true;
         keys[e.code] = true; 
@@ -155,31 +173,9 @@ window.addEventListener('load', function() {
             return; 
         }
 
-        let reachArea = {x: player.x, y: player.y, w: TILE_SIZE, h: TILE_SIZE};
-        let reach = 25;
-        if (player.facing === 'up') { reachArea.y -= reach; reachArea.h = reach; }
-        else if (player.facing === 'down') { reachArea.y += TILE_SIZE; reachArea.h = reach; }
-        else if (player.facing === 'left') { reachArea.x -= reach; reachArea.w = reach; }
-        else if (player.facing === 'right') { reachArea.x += TILE_SIZE; reachArea.w = reach; }
-
-        if (e.code === 'Space') {
-            for (let i = trees.length - 1; i >= 0; i--) {
-                let t = trees[i];
-                if (reachArea.x < t.x + TILE_SIZE && reachArea.x + reachArea.w > t.x &&
-                    reachArea.y < t.y + TILE_SIZE && reachArea.y + reachArea.h > t.y) {
-                    t.health -= player.axe_damage;
-                    if (t.health <= 0) {
-                        respawnQueue.push({x: t.x, y: t.y, time: Date.now()});
-                        trees.splice(i, 1);
-                        player.wood += Math.floor(Math.random() * 4) + 2;
-                    }
-                }
-            }
-        }
-        
         if (e.key.toLowerCase() === 'e') {
             let mDist = Math.sqrt(Math.pow((merchant.x+20) - (player.x+20), 2) + Math.pow((merchant.y+20) - (player.y+20), 2));
-            if (mDist < 70) {
+            if (mDist < 80) {
                 inShop = true;
                 shopDiv.style.display = 'block';
                 updateShopUI();
@@ -192,7 +188,6 @@ window.addEventListener('load', function() {
         keys[e.code] = false; 
     });
 
-    // Shop UI Actions
     function updateShopUI() {
         document.getElementById('btn-upgrade').innerText = `Upgrade Axe (${player.axe_level * 50} Plat) [2]`;
     }
@@ -216,7 +211,25 @@ window.addEventListener('load', function() {
         shopDiv.style.display = 'none';
     };
 
-    function update() {
+    function getNearbyTree() {
+        let pCenterX = player.x + PLAYER_SIZE / 2;
+        let pCenterY = player.y + PLAYER_SIZE / 2;
+
+        for (let i = 0; i < trees.length; i++) {
+            let t = trees[i];
+            let tCenterX = t.x + TREE_SIZE / 2;
+            let tCenterY = t.y + TREE_SIZE / 2;
+            
+            // Expanded hitbox distance check
+            let dist = Math.sqrt(Math.pow(pCenterX - tCenterX, 2) + Math.pow(pCenterY - tCenterY, 2));
+            if (dist < 75) {
+                return t;
+            }
+        }
+        return null;
+    }
+
+    function update(dt) {
         if (!inShop) {
             let dx = 0, dy = 0;
             if (keys['w'] || keys['arrowup']) { dy -= player.speed; player.facing = 'up'; }
@@ -232,18 +245,70 @@ window.addEventListener('load', function() {
             updateWorldChunks();
         }
 
+        // Tree Chopping (Hold Spacebar)
+        let targetTree = getNearbyTree();
+        if (keys['Space'] && targetTree && !inShop) {
+            if (player.choppingTarget !== targetTree) {
+                player.choppingTarget = targetTree;
+                player.chopProgress = 0;
+            }
+
+            // Calculate Chop Speed based on Axe Damage
+            let requiredTime = BASE_CHOP_TIME / player.axe_damage;
+            player.chopProgress += dt;
+
+            if (Math.random() < 0.3) {
+                spawnWoodChips(targetTree.x + TREE_SIZE / 2, targetTree.y + TREE_SIZE / 2);
+            }
+
+            // Tree Felled!
+            if (player.chopProgress >= requiredTime) {
+                for (let i = 0; i < trees.length; i++) {
+                    if (trees[i] === targetTree) {
+                        respawnQueue.push({x: targetTree.x, y: targetTree.y, time: Date.now()});
+                        trees.splice(i, 1);
+                        break;
+                    }
+                }
+                player.wood += Math.floor(Math.random() * 5) + 4; // 4 to 8 wood
+                player.choppingTarget = null;
+                player.chopProgress = 0;
+                screenShake = 10; // Trigger screen shake
+            }
+        } else {
+            player.choppingTarget = null;
+            player.chopProgress = 0;
+        }
+
+        // Respawn Timers
         let now = Date.now();
         for (let i = respawnQueue.length - 1; i >= 0; i--) {
             if (now - respawnQueue[i].time >= RESPAWN_TIME) {
-                trees.push({x: respawnQueue[i].x, y: respawnQueue[i].y, health: 3});
+                trees.push({id: Math.random(), x: respawnQueue[i].x, y: respawnQueue[i].y});
                 respawnQueue.splice(i, 1);
             }
         }
+
+        // Update Wood Chip Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        if (screenShake > 0) screenShake--;
     }
 
     function draw() {
-        let camX = WIDTH / 2 - player.x - 20;
-        let camY = HEIGHT / 2 - player.y - 20;
+        let camX = WIDTH / 2 - player.x - PLAYER_SIZE / 2;
+        let camY = HEIGHT / 2 - player.y - PLAYER_SIZE / 2;
+
+        if (screenShake > 0) {
+            camX += (Math.random() - 0.5) * 6;
+            camY += (Math.random() - 0.5) * 6;
+        }
 
         // Background Grass
         ctx.fillStyle = grassPattern || '#3b5e2b';
@@ -252,17 +317,18 @@ window.addEventListener('load', function() {
         ctx.fillRect(-64, -64, WIDTH + 128, HEIGHT + 128);
         ctx.restore();
 
-        // World Coordinates Camera
+        // Camera Offset Space
         ctx.save();
         ctx.translate(camX, camY);
 
-        // Merchant Carpet & NPC
+        // Merchant Base
         ctx.fillStyle = '#781d1d';
         ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 60);
         ctx.fillStyle = '#f1c40f'; 
         ctx.fillRect(merchant.x - 20, merchant.y - 10, 80, 4);
         ctx.fillRect(merchant.x - 20, merchant.y + 46, 80, 4);
 
+        // Merchant NPC
         ctx.fillStyle = '#4a2e16';
         ctx.fillRect(merchant.x + 8, merchant.y + 8, 24, 26);
         ctx.fillStyle = '#f5c6a5';
@@ -275,143 +341,27 @@ window.addEventListener('load', function() {
         ctx.fillRect(merchant.x + 14, merchant.y + 2, 3, 3);
         ctx.fillRect(merchant.x + 23, merchant.y + 2, 3, 3);
 
-        // Swaying Trees
+        // Render Bigger Swaying Trees
         let time = Date.now();
+        let nearbyTree = getNearbyTree();
+
         for (let i = 0; i < trees.length; i++) {
             let t = trees[i];
-            if (t.x > player.x - 500 && t.x < player.x + 500 && t.y > player.y - 400 && t.y < player.y + 400) {
-                let sway = Math.sin((time / 350) + t.x) * 3.5; 
+            if (t.x > player.x - 600 && t.x < player.x + 600 && t.y > player.y - 500 && t.y < player.y + 500) {
+                let sway = Math.sin((time / 350) + t.x) * 4; 
                 
-                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.25)';
                 ctx.beginPath();
-                ctx.ellipse(t.x + 20, t.y + 38, 16, 6, 0, 0, Math.PI * 2);
+                ctx.ellipse(t.x + TREE_SIZE/2, t.y + TREE_SIZE - 5, 35, 12, 0, 0, Math.PI * 2);
                 ctx.fill();
 
-                ctx.fillStyle = '#5c3a21'; 
-                ctx.fillRect(t.x + 14, t.y + 16, 12, 22);
+                // Large Trunk
+                ctx.fillStyle = '#4a2e16'; 
+                ctx.fillRect(t.x + 28, t.y + 35, 24, 45);
                 
-                ctx.fillStyle = '#274e13'; 
+                // Massive Triple-Layer Canopy
+                ctx.fillStyle = '#1e3d0f'; 
                 ctx.beginPath();
-                ctx.arc(t.x + 20 + sway, t.y, 20, 0, Math.PI * 2); 
-                ctx.arc(t.x + 6 + sway, t.y + 12, 16, 0, Math.PI * 2); 
-                ctx.arc(t.x + 34 + sway, t.y + 12, 16, 0, Math.PI * 2); 
-                ctx.fill();
-
-                ctx.fillStyle = '#386e1d';
-                ctx.beginPath();
-                ctx.arc(t.x + 16 + sway, t.y - 4, 12, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        // Player (Lumberjack)
-        let px = player.x;
-        let py = player.y;
-
-        ctx.fillStyle = '#1b365d';
-        ctx.fillRect(px + 10, py + 30, 8, 10);
-        ctx.fillRect(px + 22, py + 30, 8, 10);
-
-        ctx.fillStyle = '#b02323';
-        ctx.fillRect(px + 8, py + 16, 24, 14);
-        ctx.fillStyle = '#6b1111';
-        ctx.fillRect(px + 12, py + 16, 4, 14);
-        ctx.fillRect(px + 20, py + 16, 4, 14);
-        ctx.fillRect(px + 8, py + 20, 24, 4);
-
-        ctx.fillStyle = '#f5c6a5';
-        ctx.fillRect(px + 12, py + 2, 16, 14);
-        ctx.fillStyle = '#3a2212';
-        if (player.facing === 'up') { 
-            ctx.fillRect(px + 12, py + 2, 16, 14); 
-        } else {
-            ctx.fillRect(px + 12, py + 2, 16, 4); 
-            if (player.facing === 'down') {
-                ctx.fillRect(px + 12, py + 12, 16, 4); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 15, py + 7, 3, 3); 
-                ctx.fillRect(px + 22, py + 7, 3, 3);
-            } else if (player.facing === 'left') {
-                ctx.fillRect(px + 12, py + 8, 6, 8); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 14, py + 7, 3, 3); 
-            } else if (player.facing === 'right') {
-                ctx.fillRect(px + 22, py + 8, 6, 8); 
-                ctx.fillStyle = 'black'; 
-                ctx.fillRect(px + 23, py + 7, 3, 3); 
-            }
-        }
-
-        if (player.facing === 'right' || player.facing === 'down') {
-            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 28, py + 18, 4, 16);
-            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 30, py + 16, 8, 8);
-        } else if (player.facing === 'left' || player.facing === 'up') {
-            ctx.fillStyle = '#5c4033'; ctx.fillRect(px + 8, py + 18, 4, 16);
-            ctx.fillStyle = '#bdc3c7'; ctx.fillRect(px + 2, py + 16, 8, 8);
-        }
-
-        ctx.restore(); 
-
-        // HUD Overlay
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(10, 10, 210, 110);
-        ctx.strokeStyle = '#daa520';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(10, 10, 210, 110);
-
-        ctx.fillStyle = '#e67e22';
-        ctx.font = 'bold 16px Arial';
-        ctx.fillText(`Wood: ${player.wood}`, 25, 38);
-        
-        ctx.fillStyle = '#e5e4e2';
-        ctx.fillText(`Platinum: ${player.platinum}`, 25, 68);
-        
-        ctx.fillStyle = '#3498db';
-        ctx.fillText(`Axe Lvl: ${player.axe_level} (Dmg ${player.axe_damage})`, 25, 98);
-
-        // Merchant Compass
-        let dxM = (merchant.x + 20) - (player.x + 20);
-        let dyM = (merchant.y + 20) - (player.y + 20);
-        let angle = Math.atan2(dyM, dxM);
-        let dist = Math.sqrt(dxM * dxM + dyM * dyM);
-        
-        if (dist > 250) { 
-            ctx.save();
-            ctx.translate(WIDTH / 2, 35); 
-            ctx.rotate(angle);
-            
-            ctx.fillStyle = '#e74c3c';
-            ctx.beginPath();
-            ctx.moveTo(14, 0);
-            ctx.lineTo(-10, -8);
-            ctx.lineTo(-4, 0);
-            ctx.lineTo(-10, 8);
-            ctx.fill();
-            
-            ctx.restore();
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '13px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Merchant: ${Math.floor(dist/10)}m`, WIDTH / 2, 58);
-            ctx.textAlign = 'left'; 
-        } else if (dist < 70) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Press [E] to Shop`, WIDTH / 2, HEIGHT - 40);
-            ctx.textAlign = 'left';
-        }
-    }
-
-    function gameLoop() {
-        update();
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
-
-    gameLoop();
-});
-</script>
-</body>
-</html>
+                ctx.arc(t.x + 40 + sway, t.y + 10, 38, 0, Math.PI * 2); 
+                ctx.arc(t.x + 15 + sway, t.
