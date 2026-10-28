@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Rebirth & Stat Slider Edition</title>
+<title>Stormblade - Rebirth & Fixed Multiplayer Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -462,7 +462,6 @@ window.addEventListener('load', function() {
 
     document.addEventListener('keydown', function(e) {
         let activeEl = document.activeElement;
-        // Block key listeners if focus is on ANY input, slider, select, or text control
         if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) return;
 
         // Press 'O' key to trigger Custom Quick Link!
@@ -513,6 +512,7 @@ window.addEventListener('load', function() {
         } else {
             exitShop();
         }
+        broadcastPosition(true);
         saveGame();
     }
 
@@ -574,6 +574,7 @@ window.addEventListener('load', function() {
             saveGame();
             updateUIs();
             exitShop();
+            broadcastPosition(true);
         } else {
             spawnPopUp("Not Enough Platinum!", "#e74c3c", player.x, player.y - 40);
         }
@@ -617,9 +618,21 @@ window.addEventListener('load', function() {
 
     document.getElementById('reg-exit').onclick = exitShop;
 
-    // PEERJS MULTIPLAYER
-    let peer = null, peerConnections = [], otherPlayers = {};
+    // --- REFACTORED HIGH-PERFORMANCE MULTIPLAYER (P2P + HOST RELAY) ---
+    let peer = null, myPeerId = null, isHost = false, hostConn = null;
+    let peerConnections = {}; // Map of connection ID -> DataConnection (used by Host)
+    let otherPlayers = {};
     const roomStatus = document.getElementById('room-status');
+
+    function cleanupMultiplayer() {
+        if (peer) {
+            try { peer.destroy(); } catch(e) {}
+            peer = null;
+        }
+        myPeerId = null; isHost = false; hostConn = null;
+        peerConnections = {}; otherPlayers = {};
+        updateTargetDropdown();
+    }
 
     function addChatMessage(sender, text) {
         let box = document.getElementById('chat-messages');
@@ -630,91 +643,152 @@ window.addEventListener('load', function() {
         box.appendChild(el); box.scrollTop = box.scrollHeight;
     }
 
-    function setupDataConnection(conn) {
-        peerConnections.push(conn);
-        conn.on('data', (data) => {
-            if (data.type === 'move') {
-                otherPlayers[data.id] = { 
-                    name: data.name, x: data.x, y: data.y, facing: data.facing, 
-                    bodyColor: data.bodyColor, hat: data.hat, isGandalf: data.isGandalf, scale: data.scale || 1.0, map: data.map, lastSeen: Date.now() 
-                };
-            } else if (data.type === 'chat') {
-                addChatMessage(data.name, data.text);
-                if (otherPlayers[data.id] && otherPlayers[data.id].map === currentMap) {
-                    spawnPopUp(data.text, "#ffffff", otherPlayers[data.id].x, otherPlayers[data.id].y - (otherPlayers[data.id].isGandalf ? 95 : 35));
-                }
-            } else if (data.type === 'admin_grant') {
-                if (data.targetId === 'all' || data.targetId === (peer ? peer.id : 'self')) {
-                    if (data.plat) player.platinum += data.plat;
-                    if (data.wood) { for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+data.wood; }
-                    if (data.fish) { for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+data.fish; }
-                    if (data.scales) player.fishLoot.fishScales = (player.fishLoot.fishScales || 0) + data.scales;
-                    if (data.wipe) {
-                        for(let k in player.inventory) player.inventory[k] = 0;
-                        for(let k in player.fishLoot) player.fishLoot[k] = 0;
-                        spawnPopUp("💥 Inventory Wiped by Admin!", "#e74c3c", player.x, player.y - 45);
-                    } else {
-                        spawnPopUp("🎁 Gifted by Admin!", "#f1c40f", player.x, player.y - 45);
-                    }
-                    saveGame();
-                }
-            } else if (data.type === 'trigger_disco') {
-                startDiscoMode();
+    function getMyPacket(type = 'move', extra = {}) {
+        return Object.assign({
+            type: type,
+            id: myPeerId || 'local',
+            name: player.name,
+            x: Math.round(player.x),
+            y: Math.round(player.y),
+            facing: player.facing,
+            bodyColor: player.bodyColor,
+            hat: player.hat,
+            isGandalf: player.isGandalf,
+            scale: player.scale,
+            map: currentMap
+        }, extra);
+    }
+
+    function broadcastPosition(force = false) {
+        if (!peer || !myPeerId) return;
+        let packet = getMyPacket('move');
+
+        if (isHost) {
+            for (let pid in peerConnections) {
+                let conn = peerConnections[pid];
+                if (conn && conn.open) conn.send(packet);
             }
-        });
-        conn.on('close', () => { peerConnections = peerConnections.filter(c => c !== conn); updateTargetDropdown(); });
+        } else if (hostConn && hostConn.open) {
+            hostConn.send(packet);
+        }
+    }
+
+    function handleIncomingPacket(data, conn) {
+        if (!data || !data.id) return;
+        let senderId = data.id;
+
+        if (data.type === 'move') {
+            otherPlayers[senderId] = {
+                name: data.name, x: data.x, y: data.y, facing: data.facing,
+                bodyColor: data.bodyColor, hat: data.hat, isGandalf: data.isGandalf,
+                scale: data.scale || 1.0, map: data.map, lastSeen: Date.now()
+            };
+            updateTargetDropdown();
+        } else if (data.type === 'chat') {
+            addChatMessage(data.name, data.text);
+            if (otherPlayers[senderId] && otherPlayers[senderId].map === currentMap) {
+                spawnPopUp(data.text, "#ffffff", otherPlayers[senderId].x, otherPlayers[senderId].y - (otherPlayers[senderId].isGandalf ? 95 : 35));
+            }
+        } else if (data.type === 'admin_grant') {
+            if (data.targetId === 'all' || data.targetId === myPeerId) {
+                if (data.plat) player.platinum += data.plat;
+                if (data.wood) { for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+data.wood; }
+                if (data.fish) { for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+data.fish; }
+                if (data.scales) player.fishLoot.fishScales = (player.fishLoot.fishScales || 0) + data.scales;
+                if (data.wipe) {
+                    for(let k in player.inventory) player.inventory[k] = 0;
+                    for(let k in player.fishLoot) player.fishLoot[k] = 0;
+                    spawnPopUp("💥 Inventory Wiped by Admin!", "#e74c3c", player.x, player.y - 45);
+                } else {
+                    spawnPopUp("🎁 Gifted by Admin!", "#f1c40f", player.x, player.y - 45);
+                }
+                saveGame();
+            }
+        } else if (data.type === 'trigger_disco') {
+            startDiscoMode();
+        }
+
+        // MESH HOST RELAY: If host, automatically forward packet to all other clients!
+        if (isHost) {
+            for (let pid in peerConnections) {
+                if (pid !== senderId && peerConnections[pid] && peerConnections[pid].open) {
+                    peerConnections[pid].send(data);
+                }
+            }
+        }
     }
 
     function updateTargetDropdown() {
         let sel = document.getElementById('adm-player-target');
+        if (!sel) return;
+        let curVal = sel.value;
         sel.innerHTML = '<option value="self">Self (' + player.name + ')</option><option value="all">ALL PLAYERS</option>';
         for (let pid in otherPlayers) {
             let opt = document.createElement('option');
-            opt.value = pid; opt.innerText = otherPlayers[pid].name + ' (' + pid.substr(0,4) + ')';
+            opt.value = pid; opt.innerText = (otherPlayers[pid].name || "Player") + ' (' + pid.substr(0,4) + ')';
             sel.appendChild(opt);
         }
+        if (curVal) sel.value = curVal;
     }
 
     document.getElementById('btn-host').onclick = function() {
+        cleanupMultiplayer();
         let code = Math.floor(1000 + Math.random() * 9000).toString();
+        roomStatus.innerText = "Hosting...";
         peer = new Peer("sb-room-" + code);
-        peer.on('open', () => {
-            roomStatus.innerText = "ROOM CODE: " + code;
-            addChatMessage("System", "Room active! Give code: " + code);
+
+        peer.on('open', (id) => {
+            isHost = true; myPeerId = id;
+            roomStatus.innerText = "ROOM: " + code;
+            addChatMessage("System", "Room host ready! Code: " + code);
             spawnPopUp("Room Code: " + code, "#f1c40f", player.x, player.y - 45);
         });
-        peer.on('connection', (conn) => { setupDataConnection(conn); addChatMessage("System", "Friend connected!"); });
-        peer.on('error', () => { roomStatus.innerText = "Error hosting. Try again."; });
+
+        peer.on('connection', (conn) => {
+            peerConnections[conn.peer] = conn;
+            conn.on('data', (data) => handleIncomingPacket(data, conn));
+            conn.on('close', () => {
+                delete peerConnections[conn.peer]; delete otherPlayers[conn.peer];
+                updateTargetDropdown();
+            });
+            addChatMessage("System", "Player joined!");
+            setTimeout(() => { if (conn.open) conn.send(getMyPacket('move')); }, 250);
+        });
+
+        peer.on('error', (err) => {
+            roomStatus.innerText = "Error hosting. Retry!";
+        });
     };
 
     document.getElementById('btn-join').onclick = function() {
         let code = document.getElementById('room-input').value.trim();
-        if (code.length < 4) return;
+        if (code.length < 4) { roomStatus.innerText = "Enter Code!"; return; }
+        cleanupMultiplayer();
+        roomStatus.innerText = "Connecting...";
         peer = new Peer();
-        peer.on('open', () => {
-            let conn = peer.connect("sb-room-" + code);
-            conn.on('open', () => {
-                setupDataConnection(conn); roomStatus.innerText = "CONNECTED!";
-                addChatMessage("System", "Joined Room " + code);
-                spawnPopUp("Connected to Host!", "#2ecc71", player.x, player.y - 45);
-            });
-            conn.on('error', () => { roomStatus.innerText = "Room not found!"; });
-        });
-    };
 
-    let lastSendTime = 0;
-    function broadcastPosition() {
-        let now = Date.now();
-        if (now - lastSendTime > 50 && peerConnections.length > 0) {
-            let packet = { 
-                type: 'move', id: peer.id, name: player.name, 
-                x: Math.round(player.x), y: Math.round(player.y), facing: player.facing,
-                bodyColor: player.bodyColor, hat: player.hat, isGandalf: player.isGandalf, scale: player.scale, map: currentMap
-            };
-            peerConnections.forEach(c => { if(c.open) c.send(packet); });
-            lastSendTime = now;
-        }
-    }
+        peer.on('open', (id) => {
+            myPeerId = id;
+            hostConn = peer.connect("sb-room-" + code);
+
+            hostConn.on('open', () => {
+                roomStatus.innerText = "CONNECTED!";
+                addChatMessage("System", "Connected to Room " + code);
+                spawnPopUp("Connected to Host!", "#2ecc71", player.x, player.y - 45);
+                hostConn.send(getMyPacket('move'));
+            });
+
+            hostConn.on('data', (data) => handleIncomingPacket(data, hostConn));
+            hostConn.on('close', () => {
+                roomStatus.innerText = "Disconnected.";
+                addChatMessage("System", "Disconnected from room.");
+                otherPlayers = {}; updateTargetDropdown();
+            });
+            hostConn.on('error', () => { roomStatus.innerText = "Room error!"; });
+        });
+
+        peer.on('error', (err) => { roomStatus.innerText = "Room not found!"; });
+    };
 
     const chatInput = document.getElementById('chat-input');
     chatInput.addEventListener('keydown', e => e.stopPropagation());
@@ -723,9 +797,11 @@ window.addEventListener('load', function() {
         if (e.key === 'Enter') {
             let txt = chatInput.value.trim();
             if (txt !== '') {
-                if (peerConnections.length > 0) {
-                    let packet = { type: 'chat', id: peer ? peer.id : 'self', name: player.name, text: txt };
-                    peerConnections.forEach(c => { if(c.open) c.send(packet); });
+                let packet = getMyPacket('chat', { text: txt });
+                if (isHost) {
+                    for (let pid in peerConnections) { if (peerConnections[pid].open) peerConnections[pid].send(packet); }
+                } else if (hostConn && hostConn.open) {
+                    hostConn.send(packet);
                 }
                 addChatMessage(player.name, txt);
                 spawnPopUp(txt, "#ffffff", player.x, player.y - (player.isGandalf ? 95 : 35));
@@ -821,7 +897,7 @@ window.addEventListener('load', function() {
             } else {
                 player.x = forestPlane.x; player.y = forestPlane.y + 60;
             }
-            broadcastPosition();
+            broadcastPosition(true);
             flightOverlay.style.display = 'none';
         }, 1800);
     }
@@ -921,9 +997,12 @@ window.addEventListener('load', function() {
             }
             saveGame();
         }
-        if (peerConnections.length > 0) {
-            payload.type = 'admin_grant';
-            peerConnections.forEach(c => { if(c.open) c.send(payload); });
+
+        let packet = Object.assign({ type: 'admin_grant' }, payload);
+        if (isHost) {
+            for (let pid in peerConnections) { if (peerConnections[pid].open) peerConnections[pid].send(packet); }
+        } else if (hostConn && hostConn.open) {
+            hostConn.send(packet);
         }
     }
 
@@ -943,14 +1022,17 @@ window.addEventListener('load', function() {
             player.scale = 3.0; player.isGandalf = true;
         }
         document.getElementById('lbl-size').innerText = `Toggle 3x Gandalf Size (Current: ${player.scale}x)`;
-        broadcastPosition();
+        broadcastPosition(true);
         saveGame();
     };
 
     document.getElementById('adm-disco').onclick = () => {
         startDiscoMode();
-        if (peerConnections.length > 0) {
-            peerConnections.forEach(c => { if(c.open) c.send({ type: 'trigger_disco' }); });
+        let packet = { type: 'trigger_disco' };
+        if (isHost) {
+            for (let pid in peerConnections) { if (peerConnections[pid].open) peerConnections[pid].send(packet); }
+        } else if (hostConn && hostConn.open) {
+            hostConn.send(packet);
         }
     };
 
@@ -962,18 +1044,18 @@ window.addEventListener('load', function() {
 
     function buyOutfit(color, cost) {
         if (player.unlockedOutfits.includes(color)) {
-            player.bodyColor = color; spawnPopUp("Equipped Outfit!", "#3498db", player.x, player.y-40); broadcastPosition(); saveGame();
+            player.bodyColor = color; spawnPopUp("Equipped Outfit!", "#3498db", player.x, player.y-40); broadcastPosition(true); saveGame();
         } else if (player.platinum >= cost) {
             player.platinum -= cost; player.unlockedOutfits.push(color); player.bodyColor = color;
-            spawnPopUp("Purchased Outfit!", "#2ecc71", player.x, player.y-40); broadcastPosition(); saveGame();
+            spawnPopUp("Purchased Outfit!", "#2ecc71", player.x, player.y-40); broadcastPosition(true); saveGame();
         }
     }
     function buyHat(hatType, cost) {
         if (player.unlockedHats.includes(hatType)) {
-            player.hat = hatType; spawnPopUp("Equipped Hat!", "#9b59b6", player.x, player.y-40); broadcastPosition(); saveGame();
+            player.hat = hatType; spawnPopUp("Equipped Hat!", "#9b59b6", player.x, player.y-40); broadcastPosition(true); saveGame();
         } else if (player.platinum >= cost) {
             player.platinum -= cost; player.unlockedHats.push(hatType); player.hat = hatType;
-            spawnPopUp("Purchased Hat!", "#f1c40f", player.x, player.y-40); broadcastPosition(); saveGame();
+            spawnPopUp("Purchased Hat!", "#f1c40f", player.x, player.y-40); broadcastPosition(true); saveGame();
         }
     }
 
@@ -1019,6 +1101,7 @@ window.addEventListener('load', function() {
         }
     };
 
+    let lastHeartbeat = 0;
     function update(dt) {
         // CONTINUOUS DYNAMIC STAT CALCULATION FROM SLIDERS
         player.speed = (player.maxSpeed || 4) * (player.speedScale || 1.0);
@@ -1030,8 +1113,9 @@ window.addEventListener('load', function() {
             if (rem <= 0) { discoActive = false; discoIndicator.style.display = 'none'; }
         }
 
+        let moved = false;
         if (!inMenu && nameModal.style.display === 'none') {
-            let dx = 0, dy = 0, moved = false;
+            let dx = 0, dy = 0;
             if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
             if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; moved=true; }
             if (keys['a']||keys['arrowleft']) { dx -= player.speed; player.facing = 'left'; moved=true; }
@@ -1039,12 +1123,17 @@ window.addEventListener('load', function() {
             if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
             player.x += dx; player.y += dy;
 
-            if (moved) broadcastPosition();
-
             if (currentMap === 'forest') {
                 let cx = Math.floor(player.x/CHUNK_SIZE), cy = Math.floor(player.y/CHUNK_SIZE);
                 for(let x=cx-1; x<=cx+1; x++) for(let y=cy-1; y<=cy+1; y++) generateChunk(x,y);
             }
+        }
+
+        // Periodic Position Synchronization (50ms while moving, 1000ms while idle)
+        let now = Date.now();
+        if (moved || (now - lastHeartbeat > 1000)) {
+            broadcastPosition();
+            lastHeartbeat = now;
         }
 
         let isSpace = keys['Space'] || keys['space'];
@@ -1112,7 +1201,6 @@ window.addEventListener('load', function() {
             if (popups[i].life <= 0) popups.splice(i, 1);
         }
         
-        let now = Date.now();
         for (let i = respawnQueue.length-1; i>=0; i--) {
             if (now - respawnQueue[i].time >= 25000) {
                 trees.push({ type: getRandomTreeType(), x: respawnQueue[i].x, y: respawnQueue[i].y });
@@ -1327,10 +1415,10 @@ window.addEventListener('load', function() {
             drawPlane(cityPlane.x, cityPlane.y, "PRESS E TO FLY TO FOREST");
         }
 
-        // Other Players
+        // Other Multiplayers (Render Online Players)
         for (let pid in otherPlayers) {
             let op = otherPlayers[pid];
-            if (time - op.lastSeen > 8000 || op.map !== currentMap) continue;
+            if (time - op.lastSeen > 10000 || op.map !== currentMap) continue;
             drawModel(op.x, op.y, op.facing, op.bodyColor || '#2980b9', op.hat || 'none', op.isGandalf, op.scale || 1.0);
             ctx.fillStyle = op.isGandalf ? '#f1c40f' : '#3498db'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center';
             ctx.fillText(op.name || "Player", op.x+20, op.y - (op.scale > 1.5 ? 45 : 12));
