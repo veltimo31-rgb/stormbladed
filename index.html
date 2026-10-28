@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Secret Admin & Waypoint Edition</title>
+<title>Stormblade - Secret Admin & Stat Tuning Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -144,13 +144,32 @@
     <div id="chat-messages"></div>
     <input type="text" id="chat-input" placeholder="Press Enter to chat..." autocomplete="off">
   </div>
+
+  <!-- NEW PLAYER TUTORIAL MODAL -->
+  <div id="tutorial-modal" class="modal-shop" style="border-color: #3498db; width: 520px;">
+    <h2 style="color: #3498db; margin-bottom: 6px;">📖 Stormblade Beginner Guide</h2>
+    <div style="text-align: left; font-size: 13px; color: #ddd; line-height: 1.6; background: #111; padding: 15px; border-radius: 6px; margin: 12px 0;">
+      <p><strong style="color: #f1c40f;">🏃 MOVEMENT:</strong> Use <b>W, A, S, D</b> or <b>Arrow Keys</b> to move your hero around the world.</p>
+      
+      <p style="margin-top: 10px; padding: 8px; background: rgba(46, 204, 113, 0.15); border-left: 3px solid #2ecc71; border-radius: 4px;">
+        <strong style="color: #2ecc71; font-size: 14px;">🪓 CHOPPING & FISHING (TAP SPACE):</strong><br>
+        Walk up to any <b>Tree</b> or <b>Pond</b> and <b>TAP or HOLD SPACEBAR</b> to chop timber or catch ocean treasures!
+      </p>
+
+      <p style="margin-top: 10px;"><strong style="color: #e74c3c;">🏛️ SHOPS & FLYING:</strong> Stand next to Merchants, Markets, or the Airplane and press <b>[E]</b> to open shops or fly to the City!</p>
+      
+      <p style="margin-top: 10px;"><strong style="color: #9b59b6;">🧭 NEVER GET LOST:</strong> Check the <b>Compass Arrow</b> at the bottom-left corner of your screen—it always points back to Town Center (0, 0)!</p>
+    </div>
+    <button class="shop-btn" id="tut-exit" style="margin-top:8px; border-color: #3498db; color: #3498db;"><span>✅</span> <span>Got It! Let's Play</span></button>
+  </div>
   
   <!-- MERCHANT SHOP -->
   <div id="shop" class="modal-shop">
     <h2 style="color: #daa520; margin-bottom: 6px;">🏛️ City Grand Merchant</h2>
     <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Sell harvested materials and upgrade tools.</p>
-    <button class="shop-btn" id="btn-sell"><span>🪵</span> <span>Sell All Timber Inventory [1]</span></button>
-    <button class="shop-btn" id="btn-upgrade"><span>🪓</span> <span id="lbl-axe-up">Upgrade Axe Damage (50 Plat) [2]</span></button>
+    <button class="shop-btn" id="btn-tutorial" style="border-color: #3498db; color: #3498db;"><span>📜</span> <span>View How-To-Play Guide</span></button>
+    <button class="shop-btn" id="btn-sell"><span>🪵</span> <span>Sell All Timber Inventory</span></button>
+    <button class="shop-btn" id="btn-upgrade"><span>🪓</span> <span id="lbl-axe-up">Upgrade Axe Damage (50 Plat)</span></button>
     <button class="shop-btn" id="btn-exit" style="margin-top:12px;"><span>❌</span> <span>Exit Merchant [E]</span></button>
   </div>
 
@@ -158,12 +177,42 @@
   <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
     <h2 style="color: #2ecc71; margin-bottom: 6px;">🐟 Fisher Market</h2>
     <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Trade ocean treasures for permanent stat upgrades.</p>
-    <button class="shop-btn craft-btn" id="craft-rod"><span>🎣</span> <span id="lbl-rod">Upgrade Rod Speed [1]</span></button>
-    <button class="shop-btn craft-btn" id="craft-speed"><span>👟</span> <span id="lbl-speed">Swift Boots +Speed [2]</span></button>
-    <button class="shop-btn craft-btn" id="craft-luck"><span>🦈</span> <span id="lbl-luck">Shark Luck Charm +Tree Luck [3]</span></button>
-    <button class="shop-btn craft-btn" id="craft-hitbox"><span>🐬</span> <span id="lbl-multi">Dolphin Ring +Multi-Chop [4]</span></button>
-    <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;"><span>👑</span> <span id="lbl-timmah">Timmah's Blessing +ALL STATS [5]</span></button>
+    <button class="shop-btn craft-btn" id="btn-open-regulator" style="border-color:#3498db; color:#3498db;"><span>⚙️</span> <span>Stat Regulator (Scale Speed & Range)</span></button>
+    <button class="shop-btn craft-btn" id="craft-rod"><span>🎣</span> <span id="lbl-rod">Upgrade Rod Speed</span></button>
+    <button class="shop-btn craft-btn" id="craft-speed"><span>👟</span> <span id="lbl-speed">Swift Boots +Speed</span></button>
+    <button class="shop-btn craft-btn" id="craft-luck"><span>🦈</span> <span id="lbl-luck">Shark Luck Charm +Tree Luck</span></button>
+    <button class="shop-btn craft-btn" id="craft-hitbox"><span>🐬</span> <span id="lbl-multi">Dolphin Ring +Multi-Chop</span></button>
+    <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;"><span>👑</span> <span id="lbl-timmah">Timmah's Blessing +ALL STATS</span></button>
     <button class="shop-btn" id="craft-exit" style="margin-top:8px;"><span>❌</span> <span>Exit Market [E]</span></button>
+  </div>
+
+  <!-- PLAYER STAT REGULATOR MODAL (Allows scaling down speed & range up to max unlocked) -->
+  <div id="regulator-modal" class="modal-shop" style="border-color: #3498db;">
+    <h2 style="color: #3498db; margin-bottom: 4px;">⚙️ Stat Regulator</h2>
+    <p style="font-size: 12px; color: #aaa; margin-bottom: 12px;">Scale down your active Speed & Chop Size if they are too high. <i>(Capped at your unlocked maximums!)</i></p>
+
+    <div style="margin: 10px 0; text-align: left;">
+      <label style="font-size: 12px; color: #f1c40f; font-weight: bold;">👟 Active Movement Speed Scale:</label>
+      <select id="sel-speed-scale" class="admin-select" style="color:#3498db; border-color:#3498db; margin-top:4px;">
+        <option value="1.0">100% (Full Unlocked Speed)</option>
+        <option value="0.75">75% Speed</option>
+        <option value="0.50">50% Speed</option>
+        <option value="0.25">25% Speed (Default Movement)</option>
+      </select>
+    </div>
+
+    <div style="margin: 10px 0; text-align: left;">
+      <label style="font-size: 12px; color: #2ecc71; font-weight: bold;">🪓 Active Chop Size / Range Scale:</label>
+      <select id="sel-chop-scale" class="admin-select" style="color:#2ecc71; border-color:#2ecc71; margin-top:4px;">
+        <option value="1.0">100% (Full Unlocked Chop Range)</option>
+        <option value="0.75">75% Range</option>
+        <option value="0.50">50% Range</option>
+        <option value="0.25">25% Range (Default Range)</option>
+      </select>
+    </div>
+
+    <button class="shop-btn" id="reg-save" style="border-color:#3498db; color:#3498db; margin-top:12px;"><span>💾</span> <span>Apply Stat Scaling</span></button>
+    <button class="shop-btn" id="reg-exit" style="margin-top:6px;"><span>❌</span> <span>Close Regulator [E]</span></button>
   </div>
 
   <!-- IGA SUPERMARKET -->
@@ -192,14 +241,29 @@
     <h2 style="color: #9b59b6; margin-bottom: 4px;">🧙‍♂️ Secret Admin Panel</h2>
     
     <div style="margin: 10px 0;">
-      <label style="font-size: 12px; color: #aaa;">Target Player (Eyedropper Selection):</label>
+      <label style="font-size: 12px; color: #aaa;">Target Player:</label>
       <select id="adm-player-target" class="admin-select"></select>
+    </div>
+
+    <!-- Fish Scales Dropdown Tool -->
+    <div style="margin: 8px 0; display: flex; gap: 6px; align-items: center; justify-content: center;">
+      <select id="adm-scales-amount" class="admin-select" style="width: 50%; color: #3498db; border-color: #3498db;">
+        <option value="10">+10 Fish Scales</option>
+        <option value="50">+50 Fish Scales</option>
+        <option value="100">+100 Fish Scales</option>
+        <option value="500">+500 Fish Scales</option>
+        <option value="1000">+1,000 Fish Scales</option>
+      </select>
+      <button class="shop-btn admin-btn" id="adm-give-scales" style="width: 45%; margin: 0;"><span>🐟</span> <span>Grant Scales</span></button>
     </div>
 
     <button class="shop-btn admin-btn" id="adm-give-plat"><span>💎</span> <span>Give +1,000 Platinum</span></button>
     <button class="shop-btn admin-btn" id="adm-give-wood"><span>🪵</span> <span>Give +100 All Timber</span></button>
-    <button class="shop-btn admin-btn" id="adm-give-fish"><span>🐟</span> <span>Give +50 All Treasures</span></button>
-    <button class="shop-btn admin-btn" id="adm-toggle-size"><span>🔍</span> <span id="lbl-size">Toggle 3x Gandalf Size</span></button>
+    <button class="shop-btn admin-btn" id="adm-give-fish"><span>🦈</span> <span>Give +50 All Treasures</span></button>
+
+    <button class="shop-btn admin-btn" id="adm-wipe-inv" style="border-color:#e74c3c; color:#e74c3c; margin-top:6px;"><span>💥</span> <span>Remove All Wood & Treasures</span></button>
+
+    <button class="shop-btn admin-btn" id="adm-toggle-size" style="margin-top:6px;"><span>🔍</span> <span id="lbl-size">Toggle 3x Gandalf Size</span></button>
     <button class="shop-btn admin-btn" id="adm-disco" style="border-color:#f39c12; color:#f39c12;"><span>🪩</span> <span>Trigger 30s Majestic Disco Mode</span></button>
     <button class="shop-btn admin-btn" id="adm-outfits"><span>🎨</span> <span>Unlock All Cosmetics for Self</span></button>
     <button class="shop-btn" id="adm-exit" style="margin-top:10px;"><span>❌</span> <span>Close Panel [E]</span></button>
@@ -215,6 +279,8 @@ window.addEventListener('load', function() {
     const craftDiv = document.getElementById('crafting');
     const igaDiv = document.getElementById('iga-shop');
     const adminDiv = document.getElementById('admin-panel');
+    const tutorialDiv = document.getElementById('tutorial-modal');
+    const regulatorDiv = document.getElementById('regulator-modal');
     const nameModal = document.getElementById('name-modal');
     const usernameInput = document.getElementById('username-input');
     const flightOverlay = document.getElementById('flight-overlay');
@@ -262,10 +328,12 @@ window.addEventListener('load', function() {
 
     const player = {
         name: "Hero",
-        x: 0, y: 0, speed: 4, platinum: 0,
+        x: 0, y: 0, 
+        maxSpeed: 4, speed: 4, speedScale: 1.0,
+        platinum: 0,
         inventory: { oak:0, birch:0, pine:0, golden:0, majestic:0 },
         fishLoot: { seaweed:0, fishScales:0, sharkTeeth:0, dolphinTail:0, timmahsGold:0 },
-        axe_level: 1, axe_damage: 1, axe_range: 85, axe_multi: false, axe_luck: 0,
+        axe_level: 1, axe_damage: 1, maxAxeRange: 85, axe_range: 85, chopScale: 1.0, axe_multi: false, axe_luck: 0,
         rod_level: 1, facing: 'down',
         bodyColor: '#b02323', hat: 'none', unlockedOutfits: ['#b02323'], unlockedHats: ['none'],
         isGandalf: false, scale: 1.0,
@@ -313,15 +381,55 @@ window.addEventListener('load', function() {
         }
     }, true);
 
-    // USERNAME MODAL
+    // USERNAME & TUTORIAL MODALS
     document.getElementById('btn-save-name').onclick = function() {
         let val = usernameInput.value.trim();
         if (val !== "") player.name = val;
-        nameModal.style.display = 'none'; saveGame();
+        nameModal.style.display = 'none'; 
+        
+        // Show tutorial for new players automatically!
+        inMenu = true; menuType = 'tutorial';
+        tutorialDiv.style.display = 'block';
+        saveGame();
     };
+
     document.getElementById('btn-name-edit').onclick = function() {
         usernameInput.value = player.name; nameModal.style.display = 'flex';
     };
+
+    document.getElementById('btn-tutorial').onclick = function() {
+        shopDiv.style.display = 'none';
+        inMenu = true; menuType = 'tutorial';
+        tutorialDiv.style.display = 'block';
+    };
+
+    document.getElementById('tut-exit').onclick = function() {
+        exitShop();
+    };
+
+    // STAT REGULATOR (PLAYER SCALING CONTROL)
+    document.getElementById('btn-open-regulator').onclick = function() {
+        craftDiv.style.display = 'none';
+        inMenu = true; menuType = 'regulator';
+        document.getElementById('sel-speed-scale').value = player.speedScale.toString();
+        document.getElementById('sel-chop-scale').value = player.chopScale.toString();
+        regulatorDiv.style.display = 'block';
+    };
+
+    document.getElementById('reg-save').onclick = function() {
+        player.speedScale = parseFloat(document.getElementById('sel-speed-scale').value) || 1.0;
+        player.chopScale = parseFloat(document.getElementById('sel-chop-scale').value) || 1.0;
+        
+        // Recalculate effective stats capped at unlocked max
+        player.speed = player.maxSpeed * player.speedScale;
+        player.axe_range = player.maxAxeRange * player.chopScale;
+        
+        spawnPopUp("Stats Scaled!", "#3498db", player.x, player.y - 40);
+        saveGame();
+        exitShop();
+    };
+
+    document.getElementById('reg-exit').onclick = exitShop;
 
     // PEERJS MULTIPLAYER
     let peer = null, peerConnections = [], otherPlayers = {};
@@ -354,7 +462,14 @@ window.addEventListener('load', function() {
                     if (data.plat) player.platinum += data.plat;
                     if (data.wood) { for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+data.wood; }
                     if (data.fish) { for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+data.fish; }
-                    spawnPopUp("🎁 Gifted by Admin!", "#f1c40f", player.x, player.y - 45);
+                    if (data.scales) player.fishLoot.fishScales = (player.fishLoot.fishScales || 0) + data.scales;
+                    if (data.wipe) {
+                        for(let k in player.inventory) player.inventory[k] = 0;
+                        for(let k in player.fishLoot) player.fishLoot[k] = 0;
+                        spawnPopUp("💥 Inventory Wiped by Admin!", "#e74c3c", player.x, player.y - 45);
+                    } else {
+                        spawnPopUp("🎁 Gifted by Admin!", "#f1c40f", player.x, player.y - 45);
+                    }
                     saveGame();
                 }
             } else if (data.type === 'trigger_disco') {
@@ -437,9 +552,10 @@ window.addEventListener('load', function() {
     function saveGame() {
         try {
             localStorage.setItem('stormblade_save', JSON.stringify({
-                name: player.name, x: player.x, y: player.y, speed: player.speed, platinum: player.platinum,
+                name: player.name, x: player.x, y: player.y, 
+                maxSpeed: player.maxSpeed, speedScale: player.speedScale, platinum: player.platinum,
                 inventory: player.inventory, fishLoot: player.fishLoot,
-                axe_level: player.axe_level, axe_damage: player.axe_damage, axe_range: player.axe_range,
+                axe_level: player.axe_level, axe_damage: player.axe_damage, maxAxeRange: player.maxAxeRange, chopScale: player.chopScale,
                 axe_multi: player.axe_multi, axe_luck: player.axe_luck, rod_level: player.rod_level,
                 bodyColor: player.bodyColor, hat: player.hat, unlockedOutfits: player.unlockedOutfits, unlockedHats: player.unlockedHats,
                 isGandalf: player.isGandalf, scale: player.scale
@@ -452,6 +568,8 @@ window.addEventListener('load', function() {
             let str = localStorage.getItem('stormblade_save');
             if (str) {
                 let d = JSON.parse(str); Object.assign(player, d);
+                player.speed = (player.maxSpeed || 4) * (player.speedScale || 1.0);
+                player.axe_range = (player.maxAxeRange || 85) * (player.chopScale || 1.0);
                 if (d.name) nameModal.style.display = 'none';
             }
         } catch(e) {}
@@ -527,7 +645,7 @@ window.addEventListener('load', function() {
         keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
         
         if (inMenu) {
-            let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : (menuType === 'iga' ? 'iga-exit' : 'adm-exit'));
+            let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : (menuType === 'iga' ? 'iga-exit' : (menuType === 'tutorial' ? 'tut-exit' : (menuType === 'regulator' ? 'reg-exit' : 'adm-exit'))));
             if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById(exitBtn).click();
             return; 
         }
@@ -561,7 +679,7 @@ window.addEventListener('load', function() {
     });
 
     function updateUIs() {
-        document.getElementById('lbl-axe-up').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat) [2]`;
+        document.getElementById('lbl-axe-up').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat)`;
         document.getElementById('lbl-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) - 10 Seaweed (Have: ${player.fishLoot.seaweed||0})`;
         document.getElementById('lbl-speed').innerText = `Swift Boots (+Speed) - 8 Fish Scales (Have: ${player.fishLoot.fishScales||0})`;
         document.getElementById('lbl-luck').innerText = `Shark Luck Charm (+Tree Luck) - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth||0})`;
@@ -583,6 +701,7 @@ window.addEventListener('load', function() {
         inMenu = false; menuType = null; 
         shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; 
         igaDiv.style.display = 'none'; adminDiv.style.display = 'none'; 
+        tutorialDiv.style.display = 'none'; regulatorDiv.style.display = 'none';
     };
     document.getElementById('btn-exit').onclick = exitShop; 
     document.getElementById('craft-exit').onclick = exitShop;
@@ -599,7 +718,14 @@ window.addEventListener('load', function() {
             if (payload.plat) player.platinum += payload.plat;
             if (payload.wood) { for(let k in player.inventory) player.inventory[k] = (player.inventory[k]||0)+payload.wood; }
             if (payload.fish) { for(let k in player.fishLoot) player.fishLoot[k] = (player.fishLoot[k]||0)+payload.fish; }
-            spawnPopUp("Admin Granted Items!", "#9b59b6", player.x, player.y - 45);
+            if (payload.scales) player.fishLoot.fishScales = (player.fishLoot.fishScales || 0) + payload.scales;
+            if (payload.wipe) {
+                for(let k in player.inventory) player.inventory[k] = 0;
+                for(let k in player.fishLoot) player.fishLoot[k] = 0;
+                spawnPopUp("💥 Inventory Wiped!", "#e74c3c", player.x, player.y - 45);
+            } else {
+                spawnPopUp("Admin Granted Items!", "#9b59b6", player.x, player.y - 45);
+            }
             saveGame();
         }
         if (peerConnections.length > 0) {
@@ -611,6 +737,11 @@ window.addEventListener('load', function() {
     document.getElementById('adm-give-plat').onclick = () => sendAdminGrant({ plat: 1000 });
     document.getElementById('adm-give-wood').onclick = () => sendAdminGrant({ wood: 100 });
     document.getElementById('adm-give-fish').onclick = () => sendAdminGrant({ fish: 50 });
+    document.getElementById('adm-give-scales').onclick = () => {
+        let amt = parseInt(document.getElementById('adm-scales-amount').value) || 10;
+        sendAdminGrant({ scales: amt });
+    };
+    document.getElementById('adm-wipe-inv').onclick = () => sendAdminGrant({ wipe: true });
 
     document.getElementById('adm-toggle-size').onclick = () => {
         if (player.scale === 3.0) {
@@ -667,17 +798,32 @@ window.addEventListener('load', function() {
         if (player.fishLoot.seaweed >= 10) { player.fishLoot.seaweed -= 10; player.rod_level++; spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y-40); updateUIs(); saveGame(); }
     };
     document.getElementById('craft-speed').onclick = function() {
-        if (player.fishLoot.fishScales >= 8) { player.fishLoot.fishScales -= 8; player.speed += 1.2; spawnPopUp("Speed Increased!", "#3498db", player.x, player.y-40); updateUIs(); saveGame(); }
+        if (player.fishLoot.fishScales >= 8) { 
+            player.fishLoot.fishScales -= 8; 
+            player.maxSpeed += 1.2; 
+            player.speed = player.maxSpeed * player.speedScale;
+            spawnPopUp("Speed Increased!", "#3498db", player.x, player.y-40); updateUIs(); saveGame(); 
+        }
     };
     document.getElementById('craft-luck').onclick = function() {
         if (player.fishLoot.sharkTeeth >= 5) { player.fishLoot.sharkTeeth -= 5; player.axe_luck += 1.0; spawnPopUp("Tree Luck Boosted!", "#95a5a6", player.x, player.y-40); updateUIs(); saveGame(); }
     };
     document.getElementById('craft-hitbox').onclick = function() {
-        if (player.fishLoot.dolphinTail >= 3) { player.fishLoot.dolphinTail -= 3; player.axe_range += 40; player.axe_multi = true; spawnPopUp("Multi-Chop Unlocked!", "#9b59b6", player.x, player.y-40); updateUIs(); saveGame(); }
+        if (player.fishLoot.dolphinTail >= 3) { 
+            player.fishLoot.dolphinTail -= 3; 
+            player.maxAxeRange += 40; 
+            player.axe_range = player.maxAxeRange * player.chopScale;
+            player.axe_multi = true; 
+            spawnPopUp("Multi-Chop Unlocked!", "#9b59b6", player.x, player.y-40); updateUIs(); saveGame(); 
+        }
     };
     document.getElementById('craft-timmah').onclick = function() {
         if (player.fishLoot.timmahsGold >= 1) { 
-            player.fishLoot.timmahsGold--; player.speed += 1.5; player.axe_damage += 2; player.rod_level += 2; player.axe_luck += 2.0; player.axe_range += 30; player.axe_multi = true; 
+            player.fishLoot.timmahsGold--; 
+            player.maxSpeed += 1.5; player.speed = player.maxSpeed * player.speedScale;
+            player.axe_damage += 2; player.rod_level += 2; player.axe_luck += 2.0; 
+            player.maxAxeRange += 30; player.axe_range = player.maxAxeRange * player.chopScale;
+            player.axe_multi = true; 
             spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y-40); updateUIs(); saveGame(); 
         }
     };
@@ -885,6 +1031,35 @@ window.addEventListener('load', function() {
         ctx.fillText(Math.round(dist) + 'm', cx, cy + 50);
     }
 
+    function drawWorldPrompts() {
+        if (inMenu) return;
+        let pCenter = { x: player.x+20, y: player.y+20 };
+        
+        // Dynamic Tap Space Prompt for Trees
+        if (currentMap === 'forest') {
+            for (let t of trees) {
+                if (Math.hypot(pCenter.x - (t.x+40), pCenter.y - (t.y+40)) < player.axe_range) {
+                    let bob = Math.sin(Date.now() / 150) * 4;
+                    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(t.x + 5, t.y - 30 + bob, 70, 20);
+                    ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 1; ctx.strokeRect(t.x + 5, t.y - 30 + bob, 70, 20);
+                    ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
+                    ctx.fillText("TAP SPACE", t.x + 40, t.y - 16 + bob);
+                    break;
+                }
+            }
+            // Prompt for Ponds
+            ponds.forEach(p => {
+                if (Math.hypot(pCenter.x - p.x, pCenter.y - p.y) < p.r + 45) {
+                    let bob = Math.sin(Date.now() / 150) * 4;
+                    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(p.x - 35, p.y - p.r - 25 + bob, 70, 20);
+                    ctx.strokeStyle = '#3498db'; ctx.lineWidth = 1; ctx.strokeRect(p.x - 35, p.y - p.r - 25 + bob, 70, 20);
+                    ctx.fillStyle = '#3498db'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
+                    ctx.fillText("TAP SPACE", p.x, p.y - p.r - 11 + bob);
+                }
+            });
+        }
+    }
+
     function draw() {
         let camX = Math.floor(WIDTH/2 - player.x - 20), camY = Math.floor(HEIGHT/2 - player.y - 20);
 
@@ -970,6 +1145,9 @@ window.addEventListener('load', function() {
         drawModel(player.x, player.y, player.facing, player.bodyColor, player.hat, player.isGandalf, player.scale);
         ctx.fillStyle = player.isGandalf ? '#f1c40f' : '#2ecc71'; ctx.font = 'bold 12px Arial'; ctx.textAlign='center'; 
         ctx.fillText(player.name + " (You)", player.x+20, player.y - (player.scale > 1.5 ? 45 : 12));
+
+        // World Interaction Floating Prompts
+        drawWorldPrompts();
 
         // Tool Visuals
         if (player.fishingTarget) {
