@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Fixed Secret Admin Edition</title>
+<title>Stormblade - Secret Admin & Waypoint Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -133,7 +133,6 @@
 
   <div id="multiplayer-bar">
     <button class="mp-btn" id="btn-name-edit">Edit Name</button>
-    <button class="mp-btn" id="btn-secret-admin" style="border-color:#9b59b6; color:#9b59b6;">🧙‍♂️ Admin</button>
     <button class="mp-btn" id="btn-host">Host Room</button>
     <span style="color:#aaa;">OR</span>
     <input type="text" id="room-input" placeholder="CODE" maxlength="5">
@@ -280,7 +279,7 @@ window.addEventListener('load', function() {
     const forestMerchant = { x: 120, y: -80 }, forestCrafting = { x: 240, y: -80 };
     const cityMerchant = { x: -160, y: -100 }, cityFisherMarket = { x: 160, y: -100 }, cityIGA = { x: 0, y: -180 };
 
-    // --- REFINED CHEAT CODE & HOTKEY LISTENER ---
+    // --- SECRET CHEAT CODE & HOTKEY LISTENER ---
     const cheatCode = "gandalfthewhite";
     let cheatBuffer = "";
 
@@ -291,14 +290,11 @@ window.addEventListener('load', function() {
         spawnPopUp("✨ ADMIN UNLOCKED!", "#9b59b6", player.x, player.y - 45);
     }
 
-    // Direct UI button backup trigger
-    document.getElementById('btn-secret-admin').onclick = openAdminPanelSilently;
-
     document.addEventListener('keydown', function(e) {
         let activeEl = document.activeElement;
         if (activeEl === chatInput || activeEl === document.getElementById('room-input') || activeEl === usernameInput) return;
 
-        // Emergency Instant Shortcut: Shift + A
+        // Emergency Instant Secret Shortcut: Shift + A
         if (e.shiftKey && e.key.toLowerCase() === 'a') {
             openAdminPanelSilently();
             return;
@@ -868,6 +864,27 @@ window.addEventListener('load', function() {
         ctx.restore();
     }
 
+    function drawCompass() {
+        let cx = 65, cy = HEIGHT - 65;
+        let dist = Math.hypot(player.x, player.y);
+        let angle = Math.atan2(0 - player.y, 0 - player.x);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.strokeStyle = '#daa520'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, 38, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.fillStyle = '#e74c3c'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(-12, -9); ctx.lineTo(-6, 0); ctx.lineTo(-12, 9); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
+        ctx.fillText("CENTER", cx, cy - 45);
+        ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 10px Arial';
+        ctx.fillText(Math.round(dist) + 'm', cx, cy + 50);
+    }
+
     function draw() {
         let camX = Math.floor(WIDTH/2 - player.x - 20), camY = Math.floor(HEIGHT/2 - player.y - 20);
 
@@ -999,6 +1016,9 @@ window.addEventListener('load', function() {
 
         ctx.fillStyle = '#fff'; ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
         ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🌲 Tree Luck: +${(player.axe_luck*100).toFixed(0)}% Yield`, 20, 246);
+
+        // Render Home Directional Compass
+        drawCompass();
     }
 
     let lastTime = Date.now();
