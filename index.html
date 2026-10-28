@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Secret Admin & Stat Tuning Edition</title>
+<title>Stormblade - Secret Admin & Quick Link Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -16,6 +16,22 @@
   #game-container { position: relative; width: 100vw; height: 100vh; }
   canvas { width: 100vw; height: 100vh; background-color: #3b5e2b; display: block; }
   
+  /* Top-Left Quick Link UI Banner */
+  #quick-link-bar {
+    position: absolute; top: 10px; left: 10px; z-index: 10;
+    background: rgba(0,0,0,0.85); border: 2px solid #3498db;
+    padding: 8px 12px; border-radius: 8px; color: white;
+    display: flex; gap: 8px; align-items: center; font-size: 12px;
+  }
+  #quick-url-input {
+    width: 160px; padding: 5px 8px; background: #111; color: #3498db;
+    border: 1px solid #3498db; border-radius: 4px; font-weight: bold; font-size: 12px; outline: none;
+  }
+  #quick-link-preset {
+    padding: 5px; background: #222; color: white;
+    border: 1px solid #555; border-radius: 4px; font-weight: bold; font-size: 11px; outline: none;
+  }
+
   /* Room Code UI Banner */
   #multiplayer-bar {
     position: absolute; top: 10px; right: 10px; z-index: 10;
@@ -117,6 +133,19 @@
 
   <div id="disco-indicator">🪩 DISCO MODE ACTIVE (<span id="disco-timer">30</span>s)</div>
 
+  <!-- TOP LEFT QUICK LINK BAR -->
+  <div id="quick-link-bar">
+    <span style="color:#3498db; font-weight:bold;">🔗 Quick Link [O]:</span>
+    <select id="quick-link-preset">
+      <option value="custom">Custom URL...</option>
+      <option value="https://google.com">Google</option>
+      <option value="https://youtube.com">YouTube</option>
+      <option value="https://wikipedia.org">Wikipedia</option>
+      <option value="https://roblox.com">Roblox</option>
+    </select>
+    <input type="text" id="quick-url-input" placeholder="https://..." autocomplete="off">
+  </div>
+
   <div id="flight-overlay">
     <div style="font-size: 50px; margin-bottom: 20px;">✈️</div>
     <div id="flight-text">FLYING TO CITY SQUARE...</div>
@@ -158,7 +187,9 @@
 
       <p style="margin-top: 10px;"><strong style="color: #e74c3c;">🏛️ SHOPS & FLYING:</strong> Stand next to Merchants, Markets, or the Airplane and press <b>[E]</b> to open shops or fly to the City!</p>
       
-      <p style="margin-top: 10px;"><strong style="color: #9b59b6;">🧭 NEVER GET LOST:</strong> Check the <b>Compass Arrow</b> at the bottom-left corner of your screen—it always points back to Town Center (0, 0)!</p>
+      <p style="margin-top: 10px;"><strong style="color: #3498db;">🔗 QUICK LINK SHORTCUT:</strong> Set a URL in the top-left box and press <b>[O]</b> anytime to jump to your favorite website!</p>
+      
+      <p style="margin-top: 10px;"><strong style="color: #9b59b6;">🧭 NEVER GET LOST:</strong> Check the <b>Compass Arrow</b> at the bottom-left corner—it points back to Town Center (0, 0)!</p>
     </div>
     <button class="shop-btn" id="tut-exit" style="margin-top:8px; border-color: #3498db; color: #3498db;"><span>✅</span> <span>Got It! Let's Play</span></button>
   </div>
@@ -186,7 +217,7 @@
     <button class="shop-btn" id="craft-exit" style="margin-top:8px;"><span>❌</span> <span>Exit Market [E]</span></button>
   </div>
 
-  <!-- PLAYER STAT REGULATOR MODAL (Allows scaling down speed & range up to max unlocked) -->
+  <!-- PLAYER STAT REGULATOR MODAL -->
   <div id="regulator-modal" class="modal-shop" style="border-color: #3498db;">
     <h2 style="color: #3498db; margin-bottom: 4px;">⚙️ Stat Regulator</h2>
     <p style="font-size: 12px; color: #aaa; margin-bottom: 12px;">Scale down your active Speed & Chop Size if they are too high. <i>(Capped at your unlocked maximums!)</i></p>
@@ -288,6 +319,30 @@ window.addEventListener('load', function() {
     const discoIndicator = document.getElementById('disco-indicator');
     const discoTimerEl = document.getElementById('disco-timer');
 
+    const quickPresetSelect = document.getElementById('quick-link-preset');
+    const quickUrlInput = document.getElementById('quick-url-input');
+
+    let customTargetUrl = localStorage.getItem('stormblade_custom_url') || 'https://google.com';
+    quickUrlInput.value = customTargetUrl;
+
+    quickUrlInput.addEventListener('change', function() {
+        let val = quickUrlInput.value.trim();
+        if (val && !val.startsWith('http://') && !val.startsWith('https://')) {
+            val = 'https://' + val;
+        }
+        customTargetUrl = val || 'https://google.com';
+        quickUrlInput.value = customTargetUrl;
+        localStorage.setItem('stormblade_custom_url', customTargetUrl);
+    });
+
+    quickPresetSelect.addEventListener('change', function() {
+        if (quickPresetSelect.value !== 'custom') {
+            customTargetUrl = quickPresetSelect.value;
+            quickUrlInput.value = customTargetUrl;
+            localStorage.setItem('stormblade_custom_url', customTargetUrl);
+        }
+    });
+
     let WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
     window.addEventListener('resize', () => {
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -360,7 +415,15 @@ window.addEventListener('load', function() {
 
     document.addEventListener('keydown', function(e) {
         let activeEl = document.activeElement;
-        if (activeEl === chatInput || activeEl === document.getElementById('room-input') || activeEl === usernameInput) return;
+        if (activeEl === chatInput || activeEl === document.getElementById('room-input') || activeEl === usernameInput || activeEl === quickUrlInput) return;
+
+        // Press 'O' key to trigger Custom Quick Link!
+        if (e.key.toLowerCase() === 'o') {
+            if (customTargetUrl) {
+                window.open(customTargetUrl, '_blank');
+            }
+            return;
+        }
 
         // Emergency Instant Secret Shortcut: Shift + A
         if (e.shiftKey && e.key.toLowerCase() === 'a') {
@@ -380,6 +443,13 @@ window.addEventListener('load', function() {
             }
         }
     }, true);
+
+    const exitShop = () => { 
+        inMenu = false; menuType = null; 
+        shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; 
+        igaDiv.style.display = 'none'; adminDiv.style.display = 'none'; 
+        tutorialDiv.style.display = 'none'; regulatorDiv.style.display = 'none';
+    };
 
     // USERNAME & TUTORIAL MODALS
     document.getElementById('btn-save-name').onclick = function() {
@@ -403,9 +473,7 @@ window.addEventListener('load', function() {
         tutorialDiv.style.display = 'block';
     };
 
-    document.getElementById('tut-exit').onclick = function() {
-        exitShop();
-    };
+    document.getElementById('tut-exit').onclick = exitShop;
 
     // STAT REGULATOR (PLAYER SCALING CONTROL)
     document.getElementById('btn-open-regulator').onclick = function() {
@@ -639,7 +707,7 @@ window.addEventListener('load', function() {
     }
 
     window.addEventListener('keydown', function(e) {
-        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput) return;
+        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput || document.activeElement === quickUrlInput) return;
         if (e.key === 'Enter') { chatInput.focus(); return; }
 
         keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
@@ -697,12 +765,7 @@ window.addEventListener('load', function() {
             player.platinum -= player.axe_level * 50; player.axe_level++; player.axe_damage++; updateUIs(); saveGame();
         }
     };
-    const exitShop = () => { 
-        inMenu = false; menuType = null; 
-        shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; 
-        igaDiv.style.display = 'none'; adminDiv.style.display = 'none'; 
-        tutorialDiv.style.display = 'none'; regulatorDiv.style.display = 'none';
-    };
+
     document.getElementById('btn-exit').onclick = exitShop; 
     document.getElementById('craft-exit').onclick = exitShop;
     document.getElementById('iga-exit').onclick = exitShop;
@@ -1175,38 +1238,4 @@ window.addEventListener('load', function() {
 
         // HUD Panel
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, 240, 250);
-        ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10, 240, 250);
-        ctx.textAlign = 'left';
-        
-        ctx.fillStyle = '#daa520'; ctx.font = 'bold 14px Arial'; ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 30);
-        ctx.fillStyle = '#e67e22'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- TIMBER ---`, 20, 50);
-        ctx.fillStyle = '#fff'; ctx.font = '11px Arial';
-        ctx.fillText(`🪵 Oak: ${player.inventory.oak||0} | 🤍 Birch: ${player.inventory.birch||0}`, 20, 68);
-        ctx.fillText(`🌲 Pine: ${player.inventory.pine||0} | ⭐ Golden: ${player.inventory.golden||0}`, 20, 84);
-        ctx.fillStyle = `hsl(${Math.floor((time/10)%360)}, 100%, 70%)`; ctx.fillText(`🌈 Majestic: ${player.inventory.majestic||0}`, 20, 100);
-
-        ctx.fillStyle = '#3498db'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- FISHING TREASURES ---`, 20, 122);
-        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial'; ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed||0}`, 20, 140);
-        ctx.fillStyle = '#3498db'; ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales||0}`, 20, 156);
-        ctx.fillStyle = '#95a5a6'; ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth||0}`, 20, 172);
-        ctx.fillStyle = '#9b59b6'; ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail||0}`, 20, 188);
-        ctx.fillStyle = '#f1c40f'; ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold||0}`, 20, 204);
-
-        ctx.fillStyle = '#fff'; ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
-        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🌲 Tree Luck: +${(player.axe_luck*100).toFixed(0)}% Yield`, 20, 246);
-
-        // Render Home Directional Compass
-        drawCompass();
-    }
-
-    let lastTime = Date.now();
-    function gameLoop() {
-        requestAnimationFrame(gameLoop);
-        let now = Date.now(); let dt = now - lastTime; lastTime = now;
-        try { update(dt); draw(); } catch(e) {}
-    }
-    gameLoop();
-});
-</script>
-</body>
-</html>
+        ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10
