@@ -16,9 +16,9 @@
   #game-container { position: relative; width: 100vw; height: 100vh; }
   canvas { width: 100vw; height: 100vh; background-color: #3b5e2b; display: block; }
   
-  /* Top-Left Quick Link UI Banner */
+  /* Top-Left Quick Link UI Banner - Moved to left: 260px to clear HUD at (10,10) */
   #quick-link-bar {
-    position: absolute; top: 10px; left: 10px; z-index: 10;
+    position: absolute; top: 10px; left: 260px; z-index: 10;
     background: rgba(0,0,0,0.85); border: 2px solid #3498db;
     padding: 8px 12px; border-radius: 8px; color: white;
     display: flex; gap: 8px; align-items: center; font-size: 12px;
@@ -78,6 +78,32 @@
     font-weight: bold; text-align: center; outline: none;
   }
 
+  /* Range Slider Custom Styling */
+  .stat-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;
+    background: #111;
+    outline: none;
+    border: 1px solid #555;
+    margin-top: 8px;
+  }
+  .stat-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+    border: 2px solid #fff;
+  }
+  #slider-chop::-webkit-slider-thumb {
+    background: #2ecc71;
+  }
+
   /* Name Setter Modal */
   #name-modal {
     position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -133,7 +159,7 @@
 
   <div id="disco-indicator">🪩 DISCO MODE ACTIVE (<span id="disco-timer">30</span>s)</div>
 
-  <!-- TOP LEFT QUICK LINK BAR -->
+  <!-- TOP LEFT QUICK LINK BAR (Positioned at left: 260px to clear the top-left HUD) -->
   <div id="quick-link-bar">
     <span style="color:#3498db; font-weight:bold;">🔗 Quick Link [O]:</span>
     <select id="quick-link-preset">
@@ -208,7 +234,7 @@
   <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
     <h2 style="color: #2ecc71; margin-bottom: 6px;">🐟 Fisher Market</h2>
     <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Trade ocean treasures for permanent stat upgrades.</p>
-    <button class="shop-btn craft-btn" id="btn-open-regulator" style="border-color:#3498db; color:#3498db;"><span>⚙️</span> <span>Stat Regulator (Scale Speed & Range)</span></button>
+    <button class="shop-btn craft-btn" id="btn-open-regulator" style="border-color:#3498db; color:#3498db;"><span>🎚️</span> <span>Stat Regulator Sliders (Scale Speed & Range)</span></button>
     <button class="shop-btn craft-btn" id="craft-rod"><span>🎣</span> <span id="lbl-rod">Upgrade Rod Speed</span></button>
     <button class="shop-btn craft-btn" id="craft-speed"><span>👟</span> <span id="lbl-speed">Swift Boots +Speed</span></button>
     <button class="shop-btn craft-btn" id="craft-luck"><span>🦈</span> <span id="lbl-luck">Shark Luck Charm +Tree Luck</span></button>
@@ -217,33 +243,28 @@
     <button class="shop-btn" id="craft-exit" style="margin-top:8px;"><span>❌</span> <span>Exit Market [E]</span></button>
   </div>
 
-  <!-- PLAYER STAT REGULATOR MODAL -->
+  <!-- PLAYER STAT REGULATOR MODAL (REAL SLIDERS) -->
   <div id="regulator-modal" class="modal-shop" style="border-color: #3498db;">
-    <h2 style="color: #3498db; margin-bottom: 4px;">⚙️ Stat Regulator</h2>
-    <p style="font-size: 12px; color: #aaa; margin-bottom: 12px;">Scale down your active Speed & Chop Size if they are too high. <i>(Capped at your unlocked maximums!)</i></p>
+    <h2 style="color: #3498db; margin-bottom: 4px;">🎚️ Stat Regulator Sliders</h2>
+    <p style="font-size: 12px; color: #aaa; margin-bottom: 15px;">Drag the sliders to dynamically scale down your speed or range! <i>(Capped at 100% of unlocked max)</i></p>
 
-    <div style="margin: 10px 0; text-align: left;">
-      <label style="font-size: 12px; color: #f1c40f; font-weight: bold;">👟 Active Movement Speed Scale:</label>
-      <select id="sel-speed-scale" class="admin-select" style="color:#3498db; border-color:#3498db; margin-top:4px;">
-        <option value="1.0">100% (Full Unlocked Speed)</option>
-        <option value="0.75">75% Speed</option>
-        <option value="0.50">50% Speed</option>
-        <option value="0.25">25% Speed (Default Movement)</option>
-      </select>
+    <div style="margin: 15px 0; text-align: left;">
+      <div style="display:flex; justify-content:space-between; font-size: 13px;">
+        <span style="color: #f1c40f; font-weight: bold;">👟 Active Movement Speed Scale:</span>
+        <span id="speed-slider-val" style="color: #3498db; font-weight: bold;">100%</span>
+      </div>
+      <input type="range" id="slider-speed" class="stat-slider" min="10" max="100" value="100">
     </div>
 
-    <div style="margin: 10px 0; text-align: left;">
-      <label style="font-size: 12px; color: #2ecc71; font-weight: bold;">🪓 Active Chop Size / Range Scale:</label>
-      <select id="sel-chop-scale" class="admin-select" style="color:#2ecc71; border-color:#2ecc71; margin-top:4px;">
-        <option value="1.0">100% (Full Unlocked Chop Range)</option>
-        <option value="0.75">75% Range</option>
-        <option value="0.50">50% Range</option>
-        <option value="0.25">25% Range (Default Range)</option>
-      </select>
+    <div style="margin: 20px 0 15px 0; text-align: left;">
+      <div style="display:flex; justify-content:space-between; font-size: 13px;">
+        <span style="color: #2ecc71; font-weight: bold;">🪓 Active Chop Size / Range Scale:</span>
+        <span id="chop-slider-val" style="color: #2ecc71; font-weight: bold;">100%</span>
+      </div>
+      <input type="range" id="slider-chop" class="stat-slider" min="10" max="100" value="100">
     </div>
 
-    <button class="shop-btn" id="reg-save" style="border-color:#3498db; color:#3498db; margin-top:12px;"><span>💾</span> <span>Apply Stat Scaling</span></button>
-    <button class="shop-btn" id="reg-exit" style="margin-top:6px;"><span>❌</span> <span>Close Regulator [E]</span></button>
+    <button class="shop-btn" id="reg-exit" style="margin-top:15px; border-color:#3498db; color:#3498db;"><span>✅</span> <span>Done / Close Regulator [E]</span></button>
   </div>
 
   <!-- IGA SUPERMARKET -->
@@ -321,6 +342,11 @@ window.addEventListener('load', function() {
 
     const quickPresetSelect = document.getElementById('quick-link-preset');
     const quickUrlInput = document.getElementById('quick-url-input');
+
+    const sliderSpeed = document.getElementById('slider-speed');
+    const sliderChop = document.getElementById('slider-chop');
+    const speedSliderValText = document.getElementById('speed-slider-val');
+    const chopSliderValText = document.getElementById('chop-slider-val');
 
     let customTargetUrl = localStorage.getItem('stormblade_custom_url') || 'https://google.com';
     quickUrlInput.value = customTargetUrl;
@@ -490,25 +516,37 @@ window.addEventListener('load', function() {
 
     document.getElementById('tut-exit').onclick = exitShop;
 
-    // STAT REGULATOR (PLAYER SCALING CONTROL)
+    // --- REAL INTERACTIVE STAT SLIDERS ---
+    function updateSliderDisplays() {
+        let sVal = Math.round((player.speedScale || 1.0) * 100);
+        let cVal = Math.round((player.chopScale || 1.0) * 100);
+        sliderSpeed.value = sVal;
+        sliderChop.value = cVal;
+        speedSliderValText.innerText = sVal + '%';
+        chopSliderValText.innerText = cVal + '%';
+    }
+
+    sliderSpeed.addEventListener('input', function() {
+        let val = parseInt(sliderSpeed.value) || 100;
+        speedSliderValText.innerText = val + '%';
+        player.speedScale = val / 100;
+        player.speed = player.maxSpeed * player.speedScale;
+        saveGame();
+    });
+
+    sliderChop.addEventListener('input', function() {
+        let val = parseInt(sliderChop.value) || 100;
+        chopSliderValText.innerText = val + '%';
+        player.chopScale = val / 100;
+        player.axe_range = player.maxAxeRange * player.chopScale;
+        saveGame();
+    });
+
     document.getElementById('btn-open-regulator').onclick = function() {
         craftDiv.style.display = 'none';
         inMenu = true; menuType = 'regulator';
-        document.getElementById('sel-speed-scale').value = player.speedScale.toString();
-        document.getElementById('sel-chop-scale').value = player.chopScale.toString();
+        updateSliderDisplays();
         regulatorDiv.style.display = 'block';
-    };
-
-    document.getElementById('reg-save').onclick = function() {
-        player.speedScale = parseFloat(document.getElementById('sel-speed-scale').value) || 1.0;
-        player.chopScale = parseFloat(document.getElementById('sel-chop-scale').value) || 1.0;
-        
-        player.speed = player.maxSpeed * player.speedScale;
-        player.axe_range = player.maxAxeRange * player.chopScale;
-        
-        spawnPopUp("Stats Scaled!", "#3498db", player.x, player.y - 40);
-        saveGame();
-        exitShop();
     };
 
     document.getElementById('reg-exit').onclick = exitShop;
@@ -879,7 +917,7 @@ window.addEventListener('load', function() {
         if (player.fishLoot.fishScales >= 8) { 
             player.fishLoot.fishScales -= 8; 
             player.maxSpeed += 1.2; 
-            player.speed = player.maxSpeed * player.speedScale;
+            player.speed = player.maxSpeed * (player.speedScale || 1.0);
             spawnPopUp("Speed Increased!", "#3498db", player.x, player.y-40); updateUIs(); saveGame(); 
         }
     };
@@ -890,7 +928,7 @@ window.addEventListener('load', function() {
         if (player.fishLoot.dolphinTail >= 3) { 
             player.fishLoot.dolphinTail -= 3; 
             player.maxAxeRange += 40; 
-            player.axe_range = player.maxAxeRange * player.chopScale;
+            player.axe_range = player.maxAxeRange * (player.chopScale || 1.0);
             player.axe_multi = true; 
             spawnPopUp("Multi-Chop Unlocked!", "#9b59b6", player.x, player.y-40); updateUIs(); saveGame(); 
         }
@@ -898,9 +936,9 @@ window.addEventListener('load', function() {
     document.getElementById('craft-timmah').onclick = function() {
         if (player.fishLoot.timmahsGold >= 1) { 
             player.fishLoot.timmahsGold--; 
-            player.maxSpeed += 1.5; player.speed = player.maxSpeed * player.speedScale;
+            player.maxSpeed += 1.5; player.speed = player.maxSpeed * (player.speedScale || 1.0);
             player.axe_damage += 2; player.rod_level += 2; player.axe_luck += 2.0; 
-            player.maxAxeRange += 30; player.axe_range = player.maxAxeRange * player.chopScale;
+            player.maxAxeRange += 30; player.axe_range = player.maxAxeRange * (player.chopScale || 1.0);
             player.axe_multi = true; 
             spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y-40); updateUIs(); saveGame(); 
         }
@@ -1251,7 +1289,7 @@ window.addEventListener('load', function() {
         
         ctx.restore();
 
-        // HUD Panel
+        // HUD Panel (Located at x:10, y:10, width:240, height:250)
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, 240, 250);
         ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10, 240, 250);
         ctx.textAlign = 'left';
