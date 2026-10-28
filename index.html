@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Rebirth & Fixed Multiplayer Edition</title>
+<title>Stormblade - Speed & Cheat Code Fixed Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -153,7 +153,7 @@
 
   <div id="disco-indicator">🪩 DISCO MODE ACTIVE (<span id="disco-timer">30</span>s)</div>
 
-  <!-- TOP LEFT QUICK LINK BAR (Positioned at left: 260px to clear the top-left HUD) -->
+  <!-- TOP LEFT QUICK LINK BAR -->
   <div id="quick-link-bar">
     <span style="color:#3498db; font-weight:bold;">🔗 Quick Link [O]:</span>
     <select id="quick-link-preset">
@@ -214,14 +214,16 @@
     <button class="shop-btn" id="tut-exit" style="margin-top:8px; border-color: #3498db; color: #3498db;"><span>✅</span> <span>Got It! Let's Play</span></button>
   </div>
   
-  <!-- MERCHANT SHOP -->
+  <!-- GRAND MERCHANT SHOP -->
   <div id="shop" class="modal-shop">
     <h2 style="color: #daa520; margin-bottom: 6px;">🏛️ City Grand Merchant</h2>
-    <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Sell harvested materials and upgrade tools.</p>
+    <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Sell harvested materials and upgrade stats or tools.</p>
     <button class="shop-btn craft-btn" id="btn-rebirth-merchant" style="border-color:#f1c40f; color:#f1c40f;"><span>🔄</span> <span class="lbl-rebirth-cost">Rebirth Hero (Cost: 500 Plat)</span></button>
-    <button class="shop-btn" id="btn-tutorial" style="border-color: #3498db; color: #3498db;"><span>📜</span> <span>View How-To-Play Guide</span></button>
+    <button class="shop-btn craft-btn" id="btn-open-regulator-merchant" style="border-color:#3498db; color:#3498db;"><span>🎚️</span> <span>Stat Regulator (Adjust Speed & Chop Range)</span></button>
+    <button class="shop-btn" id="btn-buy-speed-merchant" style="border-color:#3498db; color:#3498db;"><span>👟</span> <span id="lbl-speed-merchant">Buy +1.0 Speed Boost (100 Plat)</span></button>
     <button class="shop-btn" id="btn-sell"><span>🪵</span> <span>Sell All Timber Inventory</span></button>
     <button class="shop-btn" id="btn-upgrade"><span>🪓</span> <span id="lbl-axe-up">Upgrade Axe Damage (50 Plat)</span></button>
+    <button class="shop-btn" id="btn-tutorial" style="border-color: #3498db; color: #3498db;"><span>📜</span> <span>View How-To-Play Guide</span></button>
     <button class="shop-btn" id="btn-exit" style="margin-top:12px;"><span>❌</span> <span>Exit Merchant [E]</span></button>
   </div>
 
@@ -449,9 +451,8 @@ window.addEventListener('load', function() {
     const forestMerchant = { x: 120, y: -80 }, forestCrafting = { x: 240, y: -80 };
     const cityMerchant = { x: -160, y: -100 }, cityFisherMarket = { x: 160, y: -100 }, cityIGA = { x: 0, y: -180 };
 
-    // --- SECRET CHEAT CODE & HOTKEY LISTENER ---
-    const cheatCode = "gandalfthewhite";
-    let cheatBuffer = "";
+    // --- SECRET CHEAT CODES & HOTKEY LISTENER ---
+    let keyBuffer = "";
 
     function openAdminPanelSilently() {
         inMenu = true; menuType = 'admin';
@@ -480,13 +481,25 @@ window.addEventListener('load', function() {
 
         let char = e.key ? e.key.toLowerCase() : "";
         if (char.length === 1 && char >= 'a' && char <= 'z') {
-            cheatBuffer += char;
-            if (cheatBuffer.length > cheatCode.length) {
-                cheatBuffer = cheatBuffer.substring(cheatBuffer.length - cheatCode.length);
+            keyBuffer += char;
+            if (keyBuffer.length > 30) {
+                keyBuffer = keyBuffer.substring(keyBuffer.length - 30);
             }
-            if (cheatBuffer === cheatCode) {
-                cheatBuffer = "";
+            
+            // CHEAT CODE 1: "gandalfthewhite" -> Opens Admin Panel
+            if (keyBuffer.endsWith("gandalfthewhite")) {
+                keyBuffer = "";
                 openAdminPanelSilently();
+            }
+            // CHEAT CODE 2: "speed" -> Resets Hero back to OG base speed (4.0)
+            else if (keyBuffer.endsWith("speed")) {
+                keyBuffer = "";
+                player.maxSpeed = 4 + (player.rebirths || 0) * 1.0;
+                player.speedScale = 1.0;
+                player.speed = player.maxSpeed * player.speedScale;
+                updateSliderDisplays();
+                spawnPopUp("⚡ Speed Reset to OG!", "#3498db", player.x, player.y - 45);
+                saveGame();
             }
         }
     }, true);
@@ -609,22 +622,37 @@ window.addEventListener('load', function() {
     sliderChop.addEventListener('input', syncSliders);
     sliderChop.addEventListener('change', syncSliders);
 
-    document.getElementById('btn-open-regulator').onclick = function() {
-        craftDiv.style.display = 'none';
+    function openRegulatorModal() {
+        shopDiv.style.display = 'none'; craftDiv.style.display = 'none';
         inMenu = true; menuType = 'regulator';
         updateSliderDisplays();
         regulatorDiv.style.display = 'block';
-    };
+    }
+
+    document.getElementById('btn-open-regulator').onclick = openRegulatorModal;
+    document.getElementById('btn-open-regulator-merchant').onclick = openRegulatorModal;
 
     document.getElementById('reg-exit').onclick = exitShop;
 
-    // --- REFACTORED HIGH-PERFORMANCE MULTIPLAYER (P2P + HOST RELAY) ---
+    // --- REFACTORED HIGH-PERFORMANCE MULTIPLAYER WITH STUN SERVERS & TIMEOUT GUARDS ---
+    const PEER_CONFIG = {
+        config: {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+        }
+    };
+
     let peer = null, myPeerId = null, isHost = false, hostConn = null;
-    let peerConnections = {}; // Map of connection ID -> DataConnection (used by Host)
+    let peerConnections = {}; 
     let otherPlayers = {};
+    let joinTimeoutTimer = null;
     const roomStatus = document.getElementById('room-status');
 
     function cleanupMultiplayer() {
+        if (joinTimeoutTimer) { clearTimeout(joinTimeoutTimer); joinTimeoutTimer = null; }
         if (peer) {
             try { peer.destroy(); } catch(e) {}
             peer = null;
@@ -735,7 +763,7 @@ window.addEventListener('load', function() {
         cleanupMultiplayer();
         let code = Math.floor(1000 + Math.random() * 9000).toString();
         roomStatus.innerText = "Hosting...";
-        peer = new Peer("sb-room-" + code);
+        peer = new Peer("sb-room-" + code, PEER_CONFIG);
 
         peer.on('open', (id) => {
             isHost = true; myPeerId = id;
@@ -756,7 +784,11 @@ window.addEventListener('load', function() {
         });
 
         peer.on('error', (err) => {
-            roomStatus.innerText = "Error hosting. Retry!";
+            if (err.type === 'unavailable-id') {
+                roomStatus.innerText = "Code busy, retry!";
+            } else {
+                roomStatus.innerText = "Hosting Failed!";
+            }
         });
     };
 
@@ -765,13 +797,23 @@ window.addEventListener('load', function() {
         if (code.length < 4) { roomStatus.innerText = "Enter Code!"; return; }
         cleanupMultiplayer();
         roomStatus.innerText = "Connecting...";
-        peer = new Peer();
+        
+        // 8-second Timeout Guard to prevent infinite connecting loop
+        joinTimeoutTimer = setTimeout(() => {
+            if (roomStatus.innerText === "Connecting...") {
+                roomStatus.innerText = "Room Not Found / Timeout!";
+                cleanupMultiplayer();
+            }
+        }, 8000);
+
+        peer = new Peer(PEER_CONFIG);
 
         peer.on('open', (id) => {
             myPeerId = id;
-            hostConn = peer.connect("sb-room-" + code);
+            hostConn = peer.connect("sb-room-" + code, { reliable: true });
 
             hostConn.on('open', () => {
+                if (joinTimeoutTimer) clearTimeout(joinTimeoutTimer);
                 roomStatus.innerText = "CONNECTED!";
                 addChatMessage("System", "Connected to Room " + code);
                 spawnPopUp("Connected to Host!", "#2ecc71", player.x, player.y - 45);
@@ -784,10 +826,20 @@ window.addEventListener('load', function() {
                 addChatMessage("System", "Disconnected from room.");
                 otherPlayers = {}; updateTargetDropdown();
             });
-            hostConn.on('error', () => { roomStatus.innerText = "Room error!"; });
+            hostConn.on('error', (err) => { 
+                if (joinTimeoutTimer) clearTimeout(joinTimeoutTimer);
+                roomStatus.innerText = "Room Error!"; 
+            });
         });
 
-        peer.on('error', (err) => { roomStatus.innerText = "Room not found!"; });
+        peer.on('error', (err) => { 
+            if (joinTimeoutTimer) clearTimeout(joinTimeoutTimer);
+            if (err.type === 'peer-unavailable') {
+                roomStatus.innerText = "Room Not Found!";
+            } else {
+                roomStatus.innerText = "Connection Failed!"; 
+            }
+        });
     };
 
     const chatInput = document.getElementById('chat-input');
@@ -950,6 +1002,7 @@ window.addEventListener('load', function() {
         });
 
         document.getElementById('lbl-axe-up').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat)`;
+        document.getElementById('lbl-speed-merchant').innerText = `Buy +1.0 Speed Boost (100 Plat)`;
         document.getElementById('lbl-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) - 10 Seaweed (Have: ${player.fishLoot.seaweed||0})`;
         document.getElementById('lbl-speed').innerText = `Swift Boots (+Speed) - 8 Fish Scales (Have: ${player.fishLoot.fishScales||0})`;
         document.getElementById('lbl-luck').innerText = `Shark Luck Charm (+Tree Luck) - 5 Shark Teeth (Have: ${player.fishLoot.sharkTeeth||0})`;
@@ -969,6 +1022,16 @@ window.addEventListener('load', function() {
     document.getElementById('btn-upgrade').onclick = function() {
         if (player.platinum >= player.axe_level * 50) {
             player.platinum -= player.axe_level * 50; player.axe_level++; player.axe_damage++; updateUIs(); saveGame();
+        }
+    };
+    document.getElementById('btn-buy-speed-merchant').onclick = function() {
+        if (player.platinum >= 100) {
+            player.platinum -= 100;
+            player.maxSpeed += 1.0;
+            spawnPopUp("Purchased +1.0 Speed Boost!", "#3498db", player.x, player.y - 40);
+            updateUIs(); saveGame();
+        } else {
+            spawnPopUp("Need 100 Platinum!", "#e74c3c", player.x, player.y - 40);
         }
     };
 
