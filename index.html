@@ -403,7 +403,21 @@ window.addEventListener('load', function() {
     const speedSliderValText = document.getElementById('speed-slider-val');
     const chopSliderValText = document.getElementById('chop-slider-val');
 
-    let customTargetUrl = localStorage.getItem('stormblade_custom_url') || 'https://google.com';
+    function readSetting(key, fallback) {
+        try { return localStorage.getItem(key) || fallback; }
+        catch (error) {
+            console.warn('[Stormbladed] Could not read saved setting:', error);
+            return fallback;
+        }
+    }
+    function writeSetting(key, value) {
+        try { localStorage.setItem(key, value); return true; }
+        catch (error) {
+            console.warn('[Stormbladed] Could not save setting:', error);
+            return false;
+        }
+    }
+    let customTargetUrl = readSetting('stormblade_custom_url', 'https://google.com');
     quickUrlInput.value = customTargetUrl;
 
     quickUrlInput.addEventListener('change', function() {
@@ -413,14 +427,14 @@ window.addEventListener('load', function() {
         }
         customTargetUrl = val || 'https://google.com';
         quickUrlInput.value = customTargetUrl;
-        localStorage.setItem('stormblade_custom_url', customTargetUrl);
+        writeSetting('stormblade_custom_url', customTargetUrl);
     });
 
     quickPresetSelect.addEventListener('change', function() {
         if (quickPresetSelect.value !== 'custom') {
             customTargetUrl = quickPresetSelect.value;
             quickUrlInput.value = customTargetUrl;
-            localStorage.setItem('stormblade_custom_url', customTargetUrl);
+            writeSetting('stormblade_custom_url', customTargetUrl);
         }
     });
 
@@ -925,7 +939,9 @@ window.addEventListener('load', function() {
                 bodyColor: player.bodyColor, hat: player.hat, unlockedOutfits: player.unlockedOutfits, unlockedHats: player.unlockedHats,
                 isGandalf: player.isGandalf, scale: player.scale, hasSeenTutorial: hasSeenTutorial
             }));
-        } catch(e) {}
+        } catch(e) {
+            console.warn('[Stormbladed] Could not save game progress:', e);
+        }
     }
 
     function loadGame() {
@@ -938,7 +954,9 @@ window.addEventListener('load', function() {
                 if (d.hasSeenTutorial) hasSeenTutorial = true;
                 if (d.name && d.name !== "Hero") nameModal.style.display = 'none';
             }
-        } catch(e) {}
+        } catch(e) {
+            console.warn('[Stormbladed] Could not load saved game; starting with defaults:', e);
+        }
     }
     loadGame();
     setInterval(saveGame, 10000);
