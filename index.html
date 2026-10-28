@@ -144,6 +144,18 @@
     padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px;
     z-index: 12;
   }
+
+#mobile-action-button {
+    position: fixed; right: 22px; bottom: 22px; z-index: 9999;
+    border: 2px solid #f1c40f; border-radius: 12px;
+    background: rgba(18, 28, 18, 0.94); color: #fff;
+    font: 700 13px/1.2 Arial, sans-serif; letter-spacing: 0.4px;
+    padding: 14px 16px; min-width: 150px; min-height: 48px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.45); cursor: pointer;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+}
+#mobile-action-button.active { background: #276749; transform: translateY(1px); }
+#mobile-action-button:focus-visible { outline: 3px solid #3498db; outline-offset: 3px; }
 </style>
 </head>
 <body>
@@ -201,7 +213,7 @@
       <p><strong style="color: #f1c40f;">🏃 MOVEMENT:</strong> Use <b>W, A, S, D</b> or <b>Arrow Keys</b> to move your hero around the world.</p>
       
       <p style="margin-top: 10px; padding: 8px; background: rgba(46, 204, 113, 0.15); border-left: 3px solid #2ecc71; border-radius: 4px;">
-        <strong style="color: #2ecc71; font-size: 14px;">🪓 CHOPPING & FISHING (TAP SPACE):</strong><br>
+        <strong style="color: #2ecc71; font-size: 14px;">🪓 CHOPPING & FISHING (HOLD SPACE):</strong><br>
         Walk up to any <b>Tree</b> or <b>Pond</b> and <b>TAP or HOLD SPACEBAR</b> to chop timber or catch ocean treasures!
       </p>
 
@@ -347,6 +359,28 @@ window.addEventListener('load', function() {
     const canvas = document.getElementById('gameCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+
+    // Hold button fallback for players whose Space key is unavailable or awkward.
+    const touchActionButton = document.createElement('button');
+    touchActionButton.id = 'mobile-action-button';
+    touchActionButton.type = 'button';
+    touchActionButton.textContent = 'HOLD TO CHOP / FISH';
+    touchActionButton.setAttribute('aria-label', 'Hold to chop a tree or fish in a pond');
+    touchActionButton.addEventListener('pointerdown', function(e) {
+        e.preventDefault();
+        touchActionHeld = true;
+        touchActionButton.classList.add('active');
+        if (touchActionButton.setPointerCapture) {
+            try { touchActionButton.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type) {
+        touchActionButton.addEventListener(type, function() {
+            touchActionHeld = false;
+            touchActionButton.classList.remove('active');
+        });
+    });
+    document.body.appendChild(touchActionButton);
     const shopDiv = document.getElementById('shop');
     const craftDiv = document.getElementById('crafting');
     const igaDiv = document.getElementById('iga-shop');
@@ -398,7 +432,7 @@ window.addEventListener('load', function() {
     canvas.width = WIDTH; canvas.height = HEIGHT;
 
     const TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
-    let inMenu = false, menuType = null, keys = {};
+    let inMenu = false, menuType = null, keys = {}, touchActionHeld = false, flightInProgress = false, lastActionHintAt = 0;
     let currentMap = 'forest';
     let hasSeenTutorial = false;
 
@@ -666,9 +700,17 @@ window.addEventListener('load', function() {
         let box = document.getElementById('chat-messages');
         let el = document.createElement('div');
         el.className = 'chat-msg';
-        let color = sender === player.name ? '#f1c40f' : (sender === 'System' ? '#2ecc71' : '#3498db');
-        el.innerHTML = `<strong style="color:${color}">${sender}:</strong> ${text}`;
-        box.appendChild(el); box.scrollTop = box.scrollHeight;
+        const safeSender = String(sender == null ? 'Unknown' : sender).slice(0, 32);
+        const safeText = String(text == null ? '' : text).slice(0, 240);
+        let color = safeSender === player.name ? '#f1c40f' : (safeSender === 'System' ? '#2ecc71' : '#3498db');
+        const label = document.createElement('strong');
+        label.style.color = color;
+        label.textContent = safeSender + ': ';
+        el.appendChild(label);
+        el.appendChild(document.createTextNode(safeText));
+        box.appendChild(el);
+        while (box.children.length > 150) box.removeChild(box.firstChild);
+        box.scrollTop = box.scrollHeight;
     }
 
     function getMyPacket(type = 'move', extra = {}) {
@@ -704,6 +746,14 @@ window.addEventListener('load', function() {
     function handleIncomingPacket(data, conn) {
         if (!data || !data.id) return;
         let senderId = data.id;
+        // A guest cannot issue global admin commands. On guests, commands must
+        // come through the trusted host connection, never another peer.
+        if (data.type === 'admin_grant' || data.type === 'trigger_disco') {
+            if (isHost || conn !== hostConn) {
+                console.warn('[Stormbladed] Ignored untrusted multiplayer command:', data.type);
+                return;
+            }
+        }
 
         if (data.type === 'move') {
             otherPlayers[senderId] = {
@@ -940,6 +990,9 @@ window.addEventListener('load', function() {
     }
 
     function triggerFlight(targetMap) {
+        if (flightInProgress || targetMap === currentMap) return;
+        flightInProgress = true;
+        keys = {};
         flightOverlay.style.display = 'flex';
         flightText.innerText = targetMap === 'city' ? 'FLYING TO CITY SQUARE...' : 'FLYING BACK TO FOREST...';
         setTimeout(() => {
@@ -949,6 +1002,8 @@ window.addEventListener('load', function() {
             } else {
                 player.x = forestPlane.x; player.y = forestPlane.y + 60;
             }
+            keys = {};
+            flightInProgress = false;
             broadcastPosition(true);
             flightOverlay.style.display = 'none';
         }, 1800);
@@ -957,9 +1012,15 @@ window.addEventListener('load', function() {
     window.addEventListener('keydown', function(e) {
         let activeEl = document.activeElement;
         if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) return;
+        if (e.code === 'Space' && !inMenu && !flightInProgress && nameModal.style.display === 'none') {
+            e.preventDefault();
+        }
+        if (flightInProgress) return;
         if (e.key === 'Enter') { chatInput.focus(); return; }
 
-        keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
+        keys[e.key.toLowerCase()] = true;
+        keys[e.code] = true;
+        if (e.code === 'Space' || e.key === ' ') keys['Space'] = true; 
         
         if (inMenu) {
             let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : (menuType === 'iga' ? 'iga-exit' : (menuType === 'tutorial' ? 'tut-exit' : (menuType === 'regulator' ? 'reg-exit' : (menuType === 'rebirth' ? 'btn-cancel-rebirth' : 'adm-exit')))));
@@ -991,8 +1052,15 @@ window.addEventListener('load', function() {
         }
     });
 
-    window.addEventListener('keyup', function(e) { 
-        keys[e.key.toLowerCase()] = false; keys[e.code] = false; 
+    window.addEventListener('keyup', function(e) {
+        keys[e.key.toLowerCase()] = false;
+        keys[e.code] = false;
+        if (e.code === 'Space' || e.key === ' ') keys['Space'] = false;
+    });
+    window.addEventListener('blur', function() {
+        keys = {};
+        touchActionHeld = false;
+        touchActionButton.classList.remove('active');
     });
 
     function updateUIs() {
@@ -1013,15 +1081,29 @@ window.addEventListener('load', function() {
     document.getElementById('btn-sell').onclick = function() {
         let earned = 0;
         let rebirthMultiplier = 1 + ((player.rebirths || 0) * 0.5);
-        for (let t in player.inventory) { 
-            earned += Math.floor((player.inventory[t]||0) * TREE_TYPES[t].val * rebirthMultiplier); 
-            player.inventory[t] = 0; 
+        for (let t in player.inventory) {
+            earned += Math.floor((player.inventory[t] || 0) * TREE_TYPES[t].val * rebirthMultiplier);
+            player.inventory[t] = 0;
         }
-        player.platinum += earned; saveGame();
+        if (earned <= 0) {
+            spawnPopUp('Nothing to sell yet!', '#e74c3c', player.x, player.y - 40);
+            return;
+        }
+        player.platinum += earned;
+        spawnPopUp('Sold timber for ' + earned + ' Platinum!', '#2ecc71', player.x, player.y - 40);
+        saveGame();
     };
     document.getElementById('btn-upgrade').onclick = function() {
-        if (player.platinum >= player.axe_level * 50) {
-            player.platinum -= player.axe_level * 50; player.axe_level++; player.axe_damage++; updateUIs(); saveGame();
+        let cost = player.axe_level * 50;
+        if (player.platinum >= cost) {
+            player.platinum -= cost;
+            player.axe_level++;
+            player.axe_damage++;
+            spawnPopUp('Axe upgraded!', '#2ecc71', player.x, player.y - 40);
+            updateUIs();
+            saveGame();
+        } else {
+            spawnPopUp('Need ' + cost + ' Platinum for axe upgrade', '#e74c3c', player.x, player.y - 40);
         }
     };
     document.getElementById('btn-buy-speed-merchant').onclick = function() {
@@ -1044,6 +1126,10 @@ window.addEventListener('load', function() {
 
     // ADMIN TARGET ACTIONS
     function sendAdminGrant(payload) {
+        if (hostConn && hostConn.open && !isHost) {
+            spawnPopUp('Admin commands are host-only in multiplayer', '#e74c3c', player.x, player.y - 40);
+            return;
+        }
         let target = document.getElementById('adm-player-target').value;
         payload.targetId = target;
         if (target === 'self' || target === 'all') {
@@ -1061,7 +1147,7 @@ window.addEventListener('load', function() {
             saveGame();
         }
 
-        let packet = Object.assign({ type: 'admin_grant' }, payload);
+        let packet = Object.assign(getMyPacket('admin_grant'), payload);
         if (isHost) {
             for (let pid in peerConnections) { if (peerConnections[pid].open) peerConnections[pid].send(packet); }
         } else if (hostConn && hostConn.open) {
@@ -1090,8 +1176,12 @@ window.addEventListener('load', function() {
     };
 
     document.getElementById('adm-disco').onclick = () => {
+        if (hostConn && hostConn.open && !isHost) {
+            spawnPopUp('Only the room host can trigger disco', '#e74c3c', player.x, player.y - 40);
+            return;
+        }
         startDiscoMode();
-        let packet = { type: 'trigger_disco' };
+        let packet = getMyPacket('trigger_disco');
         if (isHost) {
             for (let pid in peerConnections) { if (peerConnections[pid].open) peerConnections[pid].send(packet); }
         } else if (hostConn && hostConn.open) {
@@ -1107,18 +1197,32 @@ window.addEventListener('load', function() {
 
     function buyOutfit(color, cost) {
         if (player.unlockedOutfits.includes(color)) {
-            player.bodyColor = color; spawnPopUp("Equipped Outfit!", "#3498db", player.x, player.y-40); broadcastPosition(true); saveGame();
+            player.bodyColor = color;
+            spawnPopUp('Equipped Outfit!', '#3498db', player.x, player.y - 40);
+            broadcastPosition(true); saveGame();
         } else if (player.platinum >= cost) {
-            player.platinum -= cost; player.unlockedOutfits.push(color); player.bodyColor = color;
-            spawnPopUp("Purchased Outfit!", "#2ecc71", player.x, player.y-40); broadcastPosition(true); saveGame();
+            player.platinum -= cost;
+            player.unlockedOutfits.push(color);
+            player.bodyColor = color;
+            spawnPopUp('Purchased Outfit!', '#2ecc71', player.x, player.y - 40);
+            broadcastPosition(true); saveGame();
+        } else {
+            spawnPopUp('Need ' + cost + ' Platinum for outfit', '#e74c3c', player.x, player.y - 40);
         }
     }
     function buyHat(hatType, cost) {
         if (player.unlockedHats.includes(hatType)) {
-            player.hat = hatType; spawnPopUp("Equipped Hat!", "#9b59b6", player.x, player.y-40); broadcastPosition(true); saveGame();
+            player.hat = hatType;
+            spawnPopUp('Equipped Hat!', '#9b59b6', player.x, player.y - 40);
+            broadcastPosition(true); saveGame();
         } else if (player.platinum >= cost) {
-            player.platinum -= cost; player.unlockedHats.push(hatType); player.hat = hatType;
-            spawnPopUp("Purchased Hat!", "#f1c40f", player.x, player.y-40); broadcastPosition(true); saveGame();
+            player.platinum -= cost;
+            player.unlockedHats.push(hatType);
+            player.hat = hatType;
+            spawnPopUp('Purchased Hat!', '#f1c40f', player.x, player.y - 40);
+            broadcastPosition(true); saveGame();
+        } else {
+            spawnPopUp('Need ' + cost + ' Platinum for hat', '#e74c3c', player.x, player.y - 40);
         }
     }
 
@@ -1133,38 +1237,46 @@ window.addEventListener('load', function() {
     document.getElementById('buy-hat-crown').onclick = () => buyHat('crown', 300);
 
     document.getElementById('craft-rod').onclick = function() {
-        if (player.fishLoot.seaweed >= 10) { player.fishLoot.seaweed -= 10; player.rod_level++; spawnPopUp("Rod Speed Upgraded!", "#2ecc71", player.x, player.y-40); updateUIs(); saveGame(); }
+        if (player.fishLoot.seaweed >= 10) {
+            player.fishLoot.seaweed -= 10; player.rod_level++;
+            spawnPopUp('Rod speed upgraded!', '#2ecc71', player.x, player.y - 40);
+            updateUIs(); saveGame();
+        } else spawnPopUp('Need 10 Seaweed!', '#e74c3c', player.x, player.y - 40);
     };
     document.getElementById('craft-speed').onclick = function() {
-        if (player.fishLoot.fishScales >= 8) { 
-            player.fishLoot.fishScales -= 8; 
-            player.maxSpeed += 1.2; 
-            spawnPopUp("Speed Increased!", "#3498db", player.x, player.y-40); updateUIs(); saveGame(); 
-        }
+        if (player.fishLoot.fishScales >= 8) {
+            player.fishLoot.fishScales -= 8; player.maxSpeed += 1.2;
+            spawnPopUp('Speed increased!', '#3498db', player.x, player.y - 40);
+            updateUIs(); saveGame();
+        } else spawnPopUp('Need 8 Fish Scales!', '#e74c3c', player.x, player.y - 40);
     };
     document.getElementById('craft-luck').onclick = function() {
-        if (player.fishLoot.sharkTeeth >= 5) { player.fishLoot.sharkTeeth -= 5; player.axe_luck += 1.0; spawnPopUp("Tree Luck Boosted!", "#95a5a6", player.x, player.y-40); updateUIs(); saveGame(); }
+        if (player.fishLoot.sharkTeeth >= 5) {
+            player.fishLoot.sharkTeeth -= 5; player.axe_luck += 1.0;
+            spawnPopUp('Tree luck boosted!', '#95a5a6', player.x, player.y - 40);
+            updateUIs(); saveGame();
+        } else spawnPopUp('Need 5 Shark Teeth!', '#e74c3c', player.x, player.y - 40);
     };
     document.getElementById('craft-hitbox').onclick = function() {
-        if (player.fishLoot.dolphinTail >= 3) { 
-            player.fishLoot.dolphinTail -= 3; 
-            player.maxAxeRange += 40; 
-            player.axe_multi = true; 
-            spawnPopUp("Multi-Chop Unlocked!", "#9b59b6", player.x, player.y-40); updateUIs(); saveGame(); 
-        }
+        if (player.fishLoot.dolphinTail >= 3) {
+            player.fishLoot.dolphinTail -= 3; player.maxAxeRange += 40; player.axe_multi = true;
+            spawnPopUp('Multi-Chop Unlocked!', '#9b59b6', player.x, player.y - 40);
+            updateUIs(); saveGame();
+        } else spawnPopUp('Need 3 Dolphin Tails!', '#e74c3c', player.x, player.y - 40);
     };
     document.getElementById('craft-timmah').onclick = function() {
-        if (player.fishLoot.timmahsGold >= 1) { 
-            player.fishLoot.timmahsGold--; 
-            player.maxSpeed += 1.5; 
-            player.axe_damage += 2; player.rod_level += 2; player.axe_luck += 2.0; 
-            player.maxAxeRange += 30; 
-            player.axe_multi = true; 
-            spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y-40); updateUIs(); saveGame(); 
-        }
+        if (player.fishLoot.timmahsGold >= 1) {
+            player.fishLoot.timmahsGold--;
+            player.maxSpeed += 1.5; player.axe_damage += 2; player.rod_level += 2;
+            player.axe_luck += 2.0; player.maxAxeRange += 30; player.axe_multi = true;
+            spawnPopUp('Timmah Blessing activated!', '#f1c40f', player.x, player.y - 40);
+            updateUIs(); saveGame();
+        } else spawnPopUp('Need 1 Timmah Gold!', '#e74c3c', player.x, player.y - 40);
     };
 
     let lastHeartbeat = 0;
+    let lastPositionBroadcastAt = 0;
+    const POSITION_BROADCAST_INTERVAL = 50;
     function update(dt) {
         // CONTINUOUS DYNAMIC STAT CALCULATION FROM SLIDERS
         player.speed = (player.maxSpeed || 4) * (player.speedScale || 1.0);
@@ -1177,7 +1289,7 @@ window.addEventListener('load', function() {
         }
 
         let moved = false;
-        if (!inMenu && nameModal.style.display === 'none') {
+        if (!inMenu && !flightInProgress && nameModal.style.display === 'none') {
             let dx = 0, dy = 0;
             if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
             if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; moved=true; }
@@ -1192,23 +1304,29 @@ window.addEventListener('load', function() {
             }
         }
 
-        // Periodic Position Synchronization (50ms while moving, 1000ms while idle)
+        // Send movement updates at most 20 times per second; keep idle heartbeats alive.
         let now = Date.now();
-        if (moved || (now - lastHeartbeat > 1000)) {
+        if ((moved && now - lastPositionBroadcastAt >= POSITION_BROADCAST_INTERVAL) || now - lastHeartbeat > 1000) {
             broadcastPosition();
+            lastPositionBroadcastAt = now;
             lastHeartbeat = now;
         }
 
-        let isSpace = keys['Space'] || keys['space'];
+        let isSpace = keys['Space'] || keys['space'] || touchActionHeld;
         let pCenter = {x: player.x+20, y: player.y+20};
         
         let matchedTrees = [];
         if (currentMap === 'forest') {
-            for (let t of trees) {
-                if (Math.hypot(pCenter.x - (t.x+40), pCenter.y - (t.y+40)) < player.axe_range) {
-                    matchedTrees.push(t); if(!player.axe_multi) break;
-                }
-            }
+            // Prioritize the nearest tree so array order cannot steal chopping progress.
+            matchedTrees = trees
+                .map(t => ({
+                    tree: t,
+                    distance: Math.hypot(pCenter.x - (t.x + 40), pCenter.y - (t.y + 40))
+                }))
+                .filter(entry => entry.distance < player.axe_range)
+                .sort((a, b) => a.distance - b.distance)
+                .map(entry => entry.tree);
+            if (!player.axe_multi) matchedTrees = matchedTrees.slice(0, 1);
         }
         let nearbyPond = currentMap === 'forest' ? ponds.find(p => Math.hypot(pCenter.x - p.x, pCenter.y - p.y) < p.r + 45) : null;
 
@@ -1253,6 +1371,11 @@ window.addEventListener('load', function() {
         } else {
             player.fishingTarget = null; player.fishProgress = 0;
             player.choppingTarget = null; player.chopProgress = 0;
+            if (isSpace && currentMap === 'forest' && !inMenu && !flightInProgress &&
+                nameModal.style.display === 'none' && now - lastActionHintAt > 1800) {
+                lastActionHintAt = now;
+                spawnPopUp('Move closer to a tree or pond', '#e67e22', player.x, player.y - 35);
+            }
         }
 
         for (let i = particles.length-1; i>=0; i--) {
@@ -1389,7 +1512,7 @@ window.addEventListener('load', function() {
                     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(t.x + 5, t.y - 30 + bob, 70, 20);
                     ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 1; ctx.strokeRect(t.x + 5, t.y - 30 + bob, 70, 20);
                     ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
-                    ctx.fillText("TAP SPACE", t.x + 40, t.y - 16 + bob);
+                    ctx.fillText("HOLD SPACE", t.x + 40, t.y - 16 + bob);
                     break;
                 }
             }
@@ -1400,7 +1523,7 @@ window.addEventListener('load', function() {
                     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(p.x - 35, p.y - p.r - 25 + bob, 70, 20);
                     ctx.strokeStyle = '#3498db'; ctx.lineWidth = 1; ctx.strokeRect(p.x - 35, p.y - p.r - 25 + bob, 70, 20);
                     ctx.fillStyle = '#3498db'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
-                    ctx.fillText("TAP SPACE", p.x, p.y - p.r - 11 + bob);
+                    ctx.fillText("HOLD SPACE", p.x, p.y - p.r - 11 + bob);
                 }
             });
         }
@@ -1548,10 +1671,22 @@ window.addEventListener('load', function() {
     }
 
     let lastTime = Date.now();
+    let lastLoggedGameLoopError = '';
+    let lastLoggedGameLoopErrorAt = 0;
     function gameLoop() {
         requestAnimationFrame(gameLoop);
         let now = Date.now(); let dt = now - lastTime; lastTime = now;
-        try { update(dt); draw(); } catch(e) {}
+        try {
+            update(dt);
+            draw();
+        } catch (e) {
+            const message = String(e && e.message ? e.message : e);
+            if (message !== lastLoggedGameLoopError || now - lastLoggedGameLoopErrorAt > 5000) {
+                console.error('[Stormbladed] Game loop error:', e);
+                lastLoggedGameLoopError = message;
+                lastLoggedGameLoopErrorAt = now;
+            }
+        }
     }
     gameLoop();
 });
