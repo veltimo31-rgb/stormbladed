@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stormblade - Secret Admin & Quick Link Edition</title>
+<title>Stormblade - Rebirth & Stat Slider Edition</title>
 <!-- PeerJS Library for Direct Browser-to-Browser Connections -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
@@ -16,7 +16,7 @@
   #game-container { position: relative; width: 100vw; height: 100vh; }
   canvas { width: 100vw; height: 100vh; background-color: #3b5e2b; display: block; }
   
-  /* Top-Left Quick Link UI Banner - Moved to left: 260px to clear HUD at (10,10) */
+  /* Top-Left Quick Link UI Banner - Positioned at left: 260px to clear HUD at (10,10) */
   #quick-link-bar {
     position: absolute; top: 10px; left: 260px; z-index: 10;
     background: rgba(0,0,0,0.85); border: 2px solid #3498db;
@@ -71,12 +71,6 @@
   .iga-btn:hover { background: #e74c3c; color: #fff; }
   .admin-btn { color: #9b59b6; border-color: #9b59b6; }
   .admin-btn:hover { background: #9b59b6; color: #fff; }
-
-  .admin-select {
-    width: 95%; padding: 8px; margin: 6px 0; background: #111;
-    color: #9b59b6; border: 1px solid #9b59b6; border-radius: 4px;
-    font-weight: bold; text-align: center; outline: none;
-  }
 
   /* Range Slider Custom Styling */
   .stat-slider {
@@ -224,6 +218,7 @@
   <div id="shop" class="modal-shop">
     <h2 style="color: #daa520; margin-bottom: 6px;">🏛️ City Grand Merchant</h2>
     <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Sell harvested materials and upgrade tools.</p>
+    <button class="shop-btn craft-btn" id="btn-rebirth-merchant" style="border-color:#f1c40f; color:#f1c40f;"><span>🔄</span> <span class="lbl-rebirth-cost">Rebirth Hero (Cost: 500 Plat)</span></button>
     <button class="shop-btn" id="btn-tutorial" style="border-color: #3498db; color: #3498db;"><span>📜</span> <span>View How-To-Play Guide</span></button>
     <button class="shop-btn" id="btn-sell"><span>🪵</span> <span>Sell All Timber Inventory</span></button>
     <button class="shop-btn" id="btn-upgrade"><span>🪓</span> <span id="lbl-axe-up">Upgrade Axe Damage (50 Plat)</span></button>
@@ -234,6 +229,7 @@
   <div id="crafting" class="modal-shop" style="border-color: #2ecc71;">
     <h2 style="color: #2ecc71; margin-bottom: 6px;">🐟 Fisher Market</h2>
     <p style="font-size: 12px; color: #ccc; margin-bottom: 12px;">Trade ocean treasures for permanent stat upgrades.</p>
+    <button class="shop-btn craft-btn" id="btn-rebirth-fisher" style="border-color:#f1c40f; color:#f1c40f;"><span>🔄</span> <span class="lbl-rebirth-cost">Rebirth Hero (Cost: 500 Plat)</span></button>
     <button class="shop-btn craft-btn" id="btn-open-regulator" style="border-color:#3498db; color:#3498db;"><span>🎚️</span> <span>Stat Regulator Sliders (Scale Speed & Range)</span></button>
     <button class="shop-btn craft-btn" id="craft-rod"><span>🎣</span> <span id="lbl-rod">Upgrade Rod Speed</span></button>
     <button class="shop-btn craft-btn" id="craft-speed"><span>👟</span> <span id="lbl-speed">Swift Boots +Speed</span></button>
@@ -241,6 +237,28 @@
     <button class="shop-btn craft-btn" id="craft-hitbox"><span>🐬</span> <span id="lbl-multi">Dolphin Ring +Multi-Chop</span></button>
     <button class="shop-btn craft-btn" id="craft-timmah" style="border-color:#f1c40f; color:#f1c40f;"><span>👑</span> <span id="lbl-timmah">Timmah's Blessing +ALL STATS</span></button>
     <button class="shop-btn" id="craft-exit" style="margin-top:8px;"><span>❌</span> <span>Exit Market [E]</span></button>
+  </div>
+
+  <!-- REBIRTH CONFIRMATION MODAL -->
+  <div id="rebirth-modal" class="modal-shop" style="border-color: #f1c40f;">
+    <h2 style="color: #f1c40f; margin-bottom: 6px;">🔄 Rebirth Confirmation</h2>
+    <p style="font-size: 13px; color: #ddd; margin-bottom: 12px; line-height: 1.5;">
+      Are you sure you want to Rebirth your Hero?<br>
+      <span style="color:#aaa; font-size:12px;">This resets wood, treasures, and level 1 upgrades, but unlocks permanent god powers:</span>
+    </p>
+
+    <div style="background: #111; padding: 12px; border-radius: 6px; text-align: left; font-size: 13px; color: #fff; margin-bottom: 15px; border-left: 3px solid #f1c40f;">
+      <p style="color:#f1c40f; font-weight:bold; margin-bottom:4px;">✨ Permanent Perks Gained:</p>
+      <p>⭐ <b>+1 Rebirth Star Level</b></p>
+      <p>💎 <b>+50% Permanent Platinum Earnings Boost</b></p>
+      <p>🪓 <b>+2 Base Axe Damage Boost</b></p>
+      <p>👟 <b>+1.0 Permanent Base Movement Speed</b></p>
+    </div>
+
+    <p style="color:#e74c3c; font-weight:bold; font-size:14px; margin-bottom: 14px;" id="rebirth-cost-text">Cost: 500 Platinum</p>
+
+    <button class="shop-btn craft-btn" id="btn-confirm-rebirth" style="border-color:#f1c40f; color:#fff; background:#8e44ad; font-size: 14px; padding: 12px;"><span>🔥</span> <span>CONFIRM REBIRTH!</span></button>
+    <button class="shop-btn" id="btn-cancel-rebirth" style="margin-top:8px;"><span>❌</span> <span>Cancel</span></button>
   </div>
 
   <!-- PLAYER STAT REGULATOR MODAL (REAL SLIDERS) -->
@@ -333,6 +351,7 @@ window.addEventListener('load', function() {
     const adminDiv = document.getElementById('admin-panel');
     const tutorialDiv = document.getElementById('tutorial-modal');
     const regulatorDiv = document.getElementById('regulator-modal');
+    const rebirthModal = document.getElementById('rebirth-modal');
     const nameModal = document.getElementById('name-modal');
     const usernameInput = document.getElementById('username-input');
     const flightOverlay = document.getElementById('flight-overlay');
@@ -411,6 +430,7 @@ window.addEventListener('load', function() {
     const player = {
         name: "Hero",
         x: 0, y: 0, 
+        rebirths: 0,
         maxSpeed: 4, speed: 4, speedScale: 1.0,
         platinum: 0,
         inventory: { oak:0, birch:0, pine:0, golden:0, majestic:0 },
@@ -442,7 +462,8 @@ window.addEventListener('load', function() {
 
     document.addEventListener('keydown', function(e) {
         let activeEl = document.activeElement;
-        if (activeEl === chatInput || activeEl === document.getElementById('room-input') || activeEl === usernameInput || activeEl === quickUrlInput) return;
+        // Block key listeners if focus is on ANY input, slider, select, or text control
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) return;
 
         // Press 'O' key to trigger Custom Quick Link!
         if (e.key.toLowerCase() === 'o') {
@@ -476,6 +497,7 @@ window.addEventListener('load', function() {
         shopDiv.style.display = 'none'; craftDiv.style.display = 'none'; 
         igaDiv.style.display = 'none'; adminDiv.style.display = 'none'; 
         tutorialDiv.style.display = 'none'; regulatorDiv.style.display = 'none';
+        rebirthModal.style.display = 'none';
     };
 
     // USERNAME & TUTORIAL MODAL HANDLERS
@@ -516,6 +538,49 @@ window.addEventListener('load', function() {
 
     document.getElementById('tut-exit').onclick = exitShop;
 
+    // --- REBIRTH SYSTEM ---
+    function openRebirthModal() {
+        shopDiv.style.display = 'none'; craftDiv.style.display = 'none';
+        inMenu = true; menuType = 'rebirth';
+        let cost = ((player.rebirths || 0) + 1) * 500;
+        document.getElementById('rebirth-cost-text').innerText = `Cost: ${cost} Platinum (You Have: ${player.platinum})`;
+        rebirthModal.style.display = 'block';
+    }
+
+    document.getElementById('btn-rebirth-merchant').onclick = openRebirthModal;
+    document.getElementById('btn-rebirth-fisher').onclick = openRebirthModal;
+
+    document.getElementById('btn-confirm-rebirth').onclick = function() {
+        let cost = ((player.rebirths || 0) + 1) * 500;
+        if (player.platinum >= cost) {
+            player.platinum -= cost;
+            player.rebirths = (player.rebirths || 0) + 1;
+
+            // Reset baseline wood, treasures & upgrades
+            for (let k in player.inventory) player.inventory[k] = 0;
+            for (let k in player.fishLoot) player.fishLoot[k] = 0;
+            player.axe_level = 1;
+            player.rod_level = 1;
+
+            // Rebirth Permanent Perks
+            player.maxSpeed = 4 + (player.rebirths * 1.0);
+            player.axe_damage = 1 + (player.rebirths * 2);
+            player.maxAxeRange = 85 + (player.rebirths * 10);
+
+            player.speed = player.maxSpeed * (player.speedScale || 1.0);
+            player.axe_range = player.maxAxeRange * (player.chopScale || 1.0);
+
+            spawnPopUp(`⭐ REBIRTH LEVEL ${player.rebirths}!`, "#f1c40f", player.x, player.y - 50);
+            saveGame();
+            updateUIs();
+            exitShop();
+        } else {
+            spawnPopUp("Not Enough Platinum!", "#e74c3c", player.x, player.y - 40);
+        }
+    };
+
+    document.getElementById('btn-cancel-rebirth').onclick = exitShop;
+
     // --- REAL INTERACTIVE STAT SLIDERS ---
     function updateSliderDisplays() {
         let sVal = Math.round((player.speedScale || 1.0) * 100);
@@ -526,21 +591,22 @@ window.addEventListener('load', function() {
         chopSliderValText.innerText = cVal + '%';
     }
 
-    sliderSpeed.addEventListener('input', function() {
-        let val = parseInt(sliderSpeed.value) || 100;
-        speedSliderValText.innerText = val + '%';
-        player.speedScale = val / 100;
-        player.speed = player.maxSpeed * player.speedScale;
-        saveGame();
-    });
+    function syncSliders() {
+        let sVal = parseInt(sliderSpeed.value) || 100;
+        speedSliderValText.innerText = sVal + '%';
+        player.speedScale = sVal / 100;
 
-    sliderChop.addEventListener('input', function() {
-        let val = parseInt(sliderChop.value) || 100;
-        chopSliderValText.innerText = val + '%';
-        player.chopScale = val / 100;
-        player.axe_range = player.maxAxeRange * player.chopScale;
+        let cVal = parseInt(sliderChop.value) || 100;
+        chopSliderValText.innerText = cVal + '%';
+        player.chopScale = cVal / 100;
+        
         saveGame();
-    });
+    }
+
+    sliderSpeed.addEventListener('input', syncSliders);
+    sliderSpeed.addEventListener('change', syncSliders);
+    sliderChop.addEventListener('input', syncSliders);
+    sliderChop.addEventListener('change', syncSliders);
 
     document.getElementById('btn-open-regulator').onclick = function() {
         craftDiv.style.display = 'none';
@@ -673,6 +739,7 @@ window.addEventListener('load', function() {
         try {
             localStorage.setItem('stormblade_save', JSON.stringify({
                 name: player.name, x: player.x, y: player.y, 
+                rebirths: player.rebirths || 0,
                 maxSpeed: player.maxSpeed, speedScale: player.speedScale, platinum: player.platinum,
                 inventory: player.inventory, fishLoot: player.fishLoot,
                 axe_level: player.axe_level, axe_damage: player.axe_damage, maxAxeRange: player.maxAxeRange, chopScale: player.chopScale,
@@ -760,13 +827,14 @@ window.addEventListener('load', function() {
     }
 
     window.addEventListener('keydown', function(e) {
-        if (document.activeElement === chatInput || document.activeElement === document.getElementById('room-input') || document.activeElement === usernameInput || document.activeElement === quickUrlInput) return;
+        let activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) return;
         if (e.key === 'Enter') { chatInput.focus(); return; }
 
         keys[e.key.toLowerCase()] = true; keys[e.code] = true; 
         
         if (inMenu) {
-            let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : (menuType === 'iga' ? 'iga-exit' : (menuType === 'tutorial' ? 'tut-exit' : (menuType === 'regulator' ? 'reg-exit' : 'adm-exit'))));
+            let exitBtn = menuType === 'shop' ? 'btn-exit' : (menuType === 'crafting' ? 'craft-exit' : (menuType === 'iga' ? 'iga-exit' : (menuType === 'tutorial' ? 'tut-exit' : (menuType === 'regulator' ? 'reg-exit' : (menuType === 'rebirth' ? 'btn-cancel-rebirth' : 'adm-exit')))));
             if (e.key.toLowerCase() === 'e' || e.key === 'Escape') document.getElementById(exitBtn).click();
             return; 
         }
@@ -800,6 +868,11 @@ window.addEventListener('load', function() {
     });
 
     function updateUIs() {
+        let rebirthCost = ((player.rebirths || 0) + 1) * 500;
+        document.querySelectorAll('.lbl-rebirth-cost').forEach(el => {
+            el.innerText = `Rebirth Hero (Cost: ${rebirthCost} Plat)`;
+        });
+
         document.getElementById('lbl-axe-up').innerText = `Upgrade Axe Damage (${player.axe_level * 50} Plat)`;
         document.getElementById('lbl-rod').innerText = `Upgrade Rod Speed (Lvl ${player.rod_level}) - 10 Seaweed (Have: ${player.fishLoot.seaweed||0})`;
         document.getElementById('lbl-speed').innerText = `Swift Boots (+Speed) - 8 Fish Scales (Have: ${player.fishLoot.fishScales||0})`;
@@ -810,7 +883,11 @@ window.addEventListener('load', function() {
 
     document.getElementById('btn-sell').onclick = function() {
         let earned = 0;
-        for (let t in player.inventory) { earned += (player.inventory[t]||0) * TREE_TYPES[t].val; player.inventory[t] = 0; }
+        let rebirthMultiplier = 1 + ((player.rebirths || 0) * 0.5);
+        for (let t in player.inventory) { 
+            earned += Math.floor((player.inventory[t]||0) * TREE_TYPES[t].val * rebirthMultiplier); 
+            player.inventory[t] = 0; 
+        }
         player.platinum += earned; saveGame();
     };
     document.getElementById('btn-upgrade').onclick = function() {
@@ -917,7 +994,6 @@ window.addEventListener('load', function() {
         if (player.fishLoot.fishScales >= 8) { 
             player.fishLoot.fishScales -= 8; 
             player.maxSpeed += 1.2; 
-            player.speed = player.maxSpeed * (player.speedScale || 1.0);
             spawnPopUp("Speed Increased!", "#3498db", player.x, player.y-40); updateUIs(); saveGame(); 
         }
     };
@@ -928,7 +1004,6 @@ window.addEventListener('load', function() {
         if (player.fishLoot.dolphinTail >= 3) { 
             player.fishLoot.dolphinTail -= 3; 
             player.maxAxeRange += 40; 
-            player.axe_range = player.maxAxeRange * (player.chopScale || 1.0);
             player.axe_multi = true; 
             spawnPopUp("Multi-Chop Unlocked!", "#9b59b6", player.x, player.y-40); updateUIs(); saveGame(); 
         }
@@ -936,15 +1011,19 @@ window.addEventListener('load', function() {
     document.getElementById('craft-timmah').onclick = function() {
         if (player.fishLoot.timmahsGold >= 1) { 
             player.fishLoot.timmahsGold--; 
-            player.maxSpeed += 1.5; player.speed = player.maxSpeed * (player.speedScale || 1.0);
+            player.maxSpeed += 1.5; 
             player.axe_damage += 2; player.rod_level += 2; player.axe_luck += 2.0; 
-            player.maxAxeRange += 30; player.axe_range = player.maxAxeRange * (player.chopScale || 1.0);
+            player.maxAxeRange += 30; 
             player.axe_multi = true; 
             spawnPopUp("TIMMAH'S BLESSING ACTIVATED!", "#f1c40f", player.x, player.y-40); updateUIs(); saveGame(); 
         }
     };
 
     function update(dt) {
+        // CONTINUOUS DYNAMIC STAT CALCULATION FROM SLIDERS
+        player.speed = (player.maxSpeed || 4) * (player.speedScale || 1.0);
+        player.axe_range = (player.maxAxeRange || 85) * (player.chopScale || 1.0);
+
         if (discoActive) {
             let rem = Math.max(0, Math.ceil((discoEndTime - Date.now()) / 1000));
             discoTimerEl.innerText = rem;
@@ -1289,27 +1368,29 @@ window.addEventListener('load', function() {
         
         ctx.restore();
 
-        // HUD Panel (Located at x:10, y:10, width:240, height:250)
-        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, 240, 250);
-        ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10, 240, 250);
+        // HUD Panel (Located at x:10, y:10, width:240, height:270)
+        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, 240, 270);
+        ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10, 240, 270);
         ctx.textAlign = 'left';
         
         ctx.fillStyle = '#daa520'; ctx.font = 'bold 14px Arial'; ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 30);
-        ctx.fillStyle = '#e67e22'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- TIMBER ---`, 20, 50);
+        ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 12px Arial'; ctx.fillText(`⭐ Rebirths: ${player.rebirths || 0} (+${(player.rebirths||0)*50}% Plat)`, 20, 48);
+        
+        ctx.fillStyle = '#e67e22'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- TIMBER ---`, 20, 68);
         ctx.fillStyle = '#fff'; ctx.font = '11px Arial';
-        ctx.fillText(`🪵 Oak: ${player.inventory.oak||0} | 🤍 Birch: ${player.inventory.birch||0}`, 20, 68);
-        ctx.fillText(`🌲 Pine: ${player.inventory.pine||0} | ⭐ Golden: ${player.inventory.golden||0}`, 20, 84);
-        ctx.fillStyle = `hsl(${Math.floor((time/10)%360)}, 100%, 70%)`; ctx.fillText(`🌈 Majestic: ${player.inventory.majestic||0}`, 20, 100);
+        ctx.fillText(`🪵 Oak: ${player.inventory.oak||0} | 🤍 Birch: ${player.inventory.birch||0}`, 20, 86);
+        ctx.fillText(`🌲 Pine: ${player.inventory.pine||0} | ⭐ Golden: ${player.inventory.golden||0}`, 20, 102);
+        ctx.fillStyle = `hsl(${Math.floor((time/10)%360)}, 100%, 70%)`; ctx.fillText(`🌈 Majestic: ${player.inventory.majestic||0}`, 20, 118);
 
-        ctx.fillStyle = '#3498db'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- FISHING TREASURES ---`, 20, 122);
-        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial'; ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed||0}`, 20, 140);
-        ctx.fillStyle = '#3498db'; ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales||0}`, 20, 156);
-        ctx.fillStyle = '#95a5a6'; ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth||0}`, 20, 172);
-        ctx.fillStyle = '#9b59b6'; ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail||0}`, 20, 188);
-        ctx.fillStyle = '#f1c40f'; ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold||0}`, 20, 204);
+        ctx.fillStyle = '#3498db'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- FISHING TREASURES ---`, 20, 140);
+        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial'; ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed||0}`, 20, 158);
+        ctx.fillStyle = '#3498db'; ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales||0}`, 20, 174);
+        ctx.fillStyle = '#95a5a6'; ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth||0}`, 20, 190);
+        ctx.fillStyle = '#9b59b6'; ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail||0}`, 20, 206);
+        ctx.fillStyle = '#f1c40f'; ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold||0}`, 20, 222);
 
-        ctx.fillStyle = '#fff'; ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
-        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🌲 Tree Luck: +${(player.axe_luck*100).toFixed(0)}% Yield`, 20, 246);
+        ctx.fillStyle = '#fff'; ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 248);
+        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🌲 Tree Luck: +${(player.axe_luck*100).toFixed(0)}% Yield`, 20, 264);
 
         // Render Home Directional Compass
         drawCompass();
