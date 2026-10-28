@@ -353,6 +353,7 @@ window.addEventListener('load', function() {
     const TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
     let inMenu = false, menuType = null, keys = {};
     let currentMap = 'forest';
+    let hasSeenTutorial = false;
 
     let discoActive = false, discoEndTime = 0;
 
@@ -451,20 +452,34 @@ window.addEventListener('load', function() {
         tutorialDiv.style.display = 'none'; regulatorDiv.style.display = 'none';
     };
 
-    // USERNAME & TUTORIAL MODALS
-    document.getElementById('btn-save-name').onclick = function() {
+    // USERNAME & TUTORIAL MODAL HANDLERS
+    function closeNameModal() {
         let val = usernameInput.value.trim();
         if (val !== "") player.name = val;
         nameModal.style.display = 'none'; 
         
-        // Show tutorial for new players automatically!
-        inMenu = true; menuType = 'tutorial';
-        tutorialDiv.style.display = 'block';
+        if (!hasSeenTutorial) {
+            hasSeenTutorial = true;
+            inMenu = true; menuType = 'tutorial';
+            tutorialDiv.style.display = 'block';
+        } else {
+            exitShop();
+        }
         saveGame();
-    };
+    }
+
+    document.getElementById('btn-save-name').onclick = closeNameModal;
+
+    usernameInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            closeNameModal();
+        }
+    });
 
     document.getElementById('btn-name-edit').onclick = function() {
-        usernameInput.value = player.name; nameModal.style.display = 'flex';
+        usernameInput.value = player.name; 
+        nameModal.style.display = 'flex';
     };
 
     document.getElementById('btn-tutorial').onclick = function() {
@@ -488,7 +503,6 @@ window.addEventListener('load', function() {
         player.speedScale = parseFloat(document.getElementById('sel-speed-scale').value) || 1.0;
         player.chopScale = parseFloat(document.getElementById('sel-chop-scale').value) || 1.0;
         
-        // Recalculate effective stats capped at unlocked max
         player.speed = player.maxSpeed * player.speedScale;
         player.axe_range = player.maxAxeRange * player.chopScale;
         
@@ -626,7 +640,7 @@ window.addEventListener('load', function() {
                 axe_level: player.axe_level, axe_damage: player.axe_damage, maxAxeRange: player.maxAxeRange, chopScale: player.chopScale,
                 axe_multi: player.axe_multi, axe_luck: player.axe_luck, rod_level: player.rod_level,
                 bodyColor: player.bodyColor, hat: player.hat, unlockedOutfits: player.unlockedOutfits, unlockedHats: player.unlockedHats,
-                isGandalf: player.isGandalf, scale: player.scale
+                isGandalf: player.isGandalf, scale: player.scale, hasSeenTutorial: hasSeenTutorial
             }));
         } catch(e) {}
     }
@@ -638,7 +652,8 @@ window.addEventListener('load', function() {
                 let d = JSON.parse(str); Object.assign(player, d);
                 player.speed = (player.maxSpeed || 4) * (player.speedScale || 1.0);
                 player.axe_range = (player.maxAxeRange || 85) * (player.chopScale || 1.0);
-                if (d.name) nameModal.style.display = 'none';
+                if (d.hasSeenTutorial) hasSeenTutorial = true;
+                if (d.name && d.name !== "Hero") nameModal.style.display = 'none';
             }
         } catch(e) {}
     }
@@ -898,7 +913,7 @@ window.addEventListener('load', function() {
             if (rem <= 0) { discoActive = false; discoIndicator.style.display = 'none'; }
         }
 
-        if (!inMenu && nameModal.style.display !== 'flex') {
+        if (!inMenu && nameModal.style.display === 'none') {
             let dx = 0, dy = 0, moved = false;
             if (keys['w']||keys['arrowup']) { dy -= player.speed; player.facing = 'up'; moved=true; }
             if (keys['s']||keys['arrowdown']) { dy += player.speed; player.facing = 'down'; moved=true; }
@@ -928,7 +943,7 @@ window.addEventListener('load', function() {
         }
         let nearbyPond = currentMap === 'forest' ? ponds.find(p => Math.hypot(pCenter.x - p.x, pCenter.y - p.y) < p.r + 45) : null;
 
-        if (isSpace && nearbyPond && matchedTrees.length===0 && !inMenu) {
+        if (isSpace && nearbyPond && matchedTrees.length===0 && !inMenu && nameModal.style.display === 'none') {
             player.choppingTarget = null;
             if (player.fishingTarget !== nearbyPond) { player.fishingTarget = nearbyPond; player.fishProgress = 0; }
             player.fishProgress += dt;
@@ -939,7 +954,7 @@ window.addEventListener('load', function() {
                 spawnPopUp(`Caught: ${FISH_TYPES[loot].name}!`, FISH_TYPES[loot].color, player.x, player.y-30);
                 player.fishingTarget = null; player.fishProgress = 0;
             }
-        } else if (isSpace && matchedTrees.length>0 && !inMenu) {
+        } else if (isSpace && matchedTrees.length>0 && !inMenu && nameModal.style.display === 'none') {
             player.fishingTarget = null;
             let target = matchedTrees[0];
             if (player.choppingTarget !== target) { player.choppingTarget = target; player.chopProgress = 0; }
@@ -1095,7 +1110,7 @@ window.addEventListener('load', function() {
     }
 
     function drawWorldPrompts() {
-        if (inMenu) return;
+        if (inMenu || nameModal.style.display !== 'none') return;
         let pCenter = { x: player.x+20, y: player.y+20 };
         
         // Dynamic Tap Space Prompt for Trees
@@ -1238,4 +1253,38 @@ window.addEventListener('load', function() {
 
         // HUD Panel
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, 240, 250);
-        ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10
+        ctx.strokeStyle = '#daa520'; ctx.strokeRect(10, 10, 240, 250);
+        ctx.textAlign = 'left';
+        
+        ctx.fillStyle = '#daa520'; ctx.font = 'bold 14px Arial'; ctx.fillText(`💎 Platinum: ${player.platinum}`, 20, 30);
+        ctx.fillStyle = '#e67e22'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- TIMBER ---`, 20, 50);
+        ctx.fillStyle = '#fff'; ctx.font = '11px Arial';
+        ctx.fillText(`🪵 Oak: ${player.inventory.oak||0} | 🤍 Birch: ${player.inventory.birch||0}`, 20, 68);
+        ctx.fillText(`🌲 Pine: ${player.inventory.pine||0} | ⭐ Golden: ${player.inventory.golden||0}`, 20, 84);
+        ctx.fillStyle = `hsl(${Math.floor((time/10)%360)}, 100%, 70%)`; ctx.fillText(`🌈 Majestic: ${player.inventory.majestic||0}`, 20, 100);
+
+        ctx.fillStyle = '#3498db'; ctx.font = 'bold 12px Arial'; ctx.fillText(`--- FISHING TREASURES ---`, 20, 122);
+        ctx.fillStyle = '#2ecc71'; ctx.font = '11px Arial'; ctx.fillText(`🌿 Seaweed: ${player.fishLoot.seaweed||0}`, 20, 140);
+        ctx.fillStyle = '#3498db'; ctx.fillText(`🐟 Fish Scales: ${player.fishLoot.fishScales||0}`, 20, 156);
+        ctx.fillStyle = '#95a5a6'; ctx.fillText(`🦈 Shark Teeth: ${player.fishLoot.sharkTeeth||0}`, 20, 172);
+        ctx.fillStyle = '#9b59b6'; ctx.fillText(`🐬 Dolphin Tail: ${player.fishLoot.dolphinTail||0}`, 20, 188);
+        ctx.fillStyle = '#f1c40f'; ctx.fillText(`👑 Timmah's Gold: ${player.fishLoot.timmahsGold||0}`, 20, 204);
+
+        ctx.fillStyle = '#fff'; ctx.fillText(`🪓 Axe Dmg: ${player.axe_damage} | 🎣 Rod Lvl: ${player.rod_level}`, 20, 230);
+        ctx.fillText(`⚡ Speed: ${player.speed.toFixed(1)} | 🌲 Tree Luck: +${(player.axe_luck*100).toFixed(0)}% Yield`, 20, 246);
+
+        // Render Home Directional Compass
+        drawCompass();
+    }
+
+    let lastTime = Date.now();
+    function gameLoop() {
+        requestAnimationFrame(gameLoop);
+        let now = Date.now(); let dt = now - lastTime; lastTime = now;
+        try { update(dt); draw(); } catch(e) {}
+    }
+    gameLoop();
+});
+</script>
+</body>
+</html>
