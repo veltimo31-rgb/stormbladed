@@ -24,7 +24,7 @@ Multiplayer requires internet access because PeerJS is loaded from a CDN and pee
 - **Enter:** Open chat while playing.
 - **O:** Open the configured quick link.
 
-Chopping and fishing take time: keep holding the action key/button while the progress bar fills. Move closer if the game shows the proximity hint.
+Chopping and fishing take time: keep holding the action key/button while the progress bar fills. Tree chopping has a larger interaction radius, so you do not need to stand as close to each tree.
 
 ## Resetting your progress
 

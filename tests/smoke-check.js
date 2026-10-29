@@ -20,7 +20,7 @@ const requiredSnippets = [
   ['touch action button', 'HOLD TO CHOP / FISH'],
   ['touch input is fed into the action state', "keys['Space'] || keys['space'] || touchActionHeld"],
   ['nearest tree gets priority', '.sort((a, b) => a.distance - b.distance)'],
-  ['out-of-range action feedback', 'Move closer to a tree or pond'],
+  ['expanded tree chop hitbox', 'TREE_CHOP_HITBOX_BONUS = 40'],
   ['admin packet has an id', "Object.assign(getMyPacket('admin_grant'), payload)"],
   ['disco packet has an id', "getMyPacket('trigger_disco')"],
   ['admin commands only come from the host on guests', 'conn !== hostConn'],
@@ -37,6 +37,11 @@ const requiredSnippets = [
 for (const [name, snippet] of requiredSnippets) {
   assert.ok(html.includes(snippet), 'required safeguard missing: ' + name);
 }
+
+assert.ok(
+  !html.includes('Move closer to a tree or pond'),
+  'the repetitive tree/pond proximity popup should stay removed'
+);
 
 // Literal getElementById references should point to HTML ids, apart from IDs
 // created dynamically in JavaScript.
