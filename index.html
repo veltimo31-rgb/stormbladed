@@ -446,7 +446,8 @@ window.addEventListener('load', function() {
     canvas.width = WIDTH; canvas.height = HEIGHT;
 
     const TREE_SIZE = 80, POND_SIZE = 110, CHUNK_SIZE = 800;
-    let inMenu = false, menuType = null, keys = {}, touchActionHeld = false, flightInProgress = false, lastActionHintAt = 0;
+    const TREE_CHOP_HITBOX_BONUS = 40;
+    let inMenu = false, menuType = null, keys = {}, touchActionHeld = false, flightInProgress = false;
     let currentMap = 'forest';
     let hasSeenTutorial = false;
 
@@ -1358,7 +1359,7 @@ window.addEventListener('load', function() {
                     tree: t,
                     distance: Math.hypot(pCenter.x - (t.x + 40), pCenter.y - (t.y + 40))
                 }))
-                .filter(entry => entry.distance < player.axe_range)
+                .filter(entry => entry.distance < player.axe_range + TREE_CHOP_HITBOX_BONUS)
                 .sort((a, b) => a.distance - b.distance)
                 .map(entry => entry.tree);
             if (!player.axe_multi) matchedTrees = matchedTrees.slice(0, 1);
@@ -1406,11 +1407,6 @@ window.addEventListener('load', function() {
         } else {
             player.fishingTarget = null; player.fishProgress = 0;
             player.choppingTarget = null; player.chopProgress = 0;
-            if (isSpace && currentMap === 'forest' && !inMenu && !flightInProgress &&
-                nameModal.style.display === 'none' && now - lastActionHintAt > 1800) {
-                lastActionHintAt = now;
-                spawnPopUp('Move closer to a tree or pond', '#e67e22', player.x, player.y - 35);
-            }
         }
 
         for (let i = particles.length-1; i>=0; i--) {
@@ -1542,7 +1538,7 @@ window.addEventListener('load', function() {
         // Dynamic Tap Space Prompt for Trees
         if (currentMap === 'forest') {
             for (let t of trees) {
-                if (Math.hypot(pCenter.x - (t.x+40), pCenter.y - (t.y+40)) < player.axe_range) {
+                if (Math.hypot(pCenter.x - (t.x+40), pCenter.y - (t.y+40)) < player.axe_range + TREE_CHOP_HITBOX_BONUS) {
                     let bob = Math.sin(Date.now() / 150) * 4;
                     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(t.x + 5, t.y - 30 + bob, 70, 20);
                     ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 1; ctx.strokeRect(t.x + 5, t.y - 30 + bob, 70, 20);
