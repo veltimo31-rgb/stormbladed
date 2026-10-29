@@ -913,6 +913,23 @@ window.addEventListener('load', function() {
         if (e.key === 'Enter') {
             let txt = chatInput.value.trim();
             if (txt !== '') {
+                // Local-only command: reset saved progress and reload before chat broadcast.
+                if (txt.toLowerCase() === 'hardreset') {
+                    try {
+                        localStorage.removeItem('stormblade_save');
+                    } catch (error) {
+                        console.error('[Stormbladed] Hard reset failed:', error);
+                        addChatMessage('System', 'Hard reset failed because browser storage is unavailable.');
+                        chatInput.value = '';
+                        chatInput.blur();
+                        return;
+                    }
+                    chatInput.value = '';
+                    chatInput.blur();
+                    window.location.reload();
+                    return;
+                }
+
                 let packet = getMyPacket('chat', { text: txt });
                 if (isHost) {
                     for (let pid in peerConnections) { if (peerConnections[pid].open) peerConnections[pid].send(packet); }

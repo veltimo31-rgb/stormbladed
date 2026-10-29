@@ -28,7 +28,10 @@ const requiredSnippets = [
   ['flight prevents repeated movement', "if (!inMenu && !flightInProgress && nameModal.style.display === 'none')"],
   ['chat uses text nodes', 'document.createTextNode(safeText)'],
   ['game-loop errors are logged', "console.error('[Stormbladed] Game loop error:'"],
-  ['storage reads have a fallback', "readSetting('stormblade_custom_url', 'https://google.com')"]
+  ['storage reads have a fallback', "readSetting('stormblade_custom_url', 'https://google.com')"],
+  ['hardreset command is detected before normal chat broadcast', "if (txt.toLowerCase() === 'hardreset')"],
+  ['hardreset clears the saved progress key', "localStorage.removeItem('stormblade_save')"],
+  ['hardreset reloads the game', 'window.location.reload()']
 ];
 
 for (const [name, snippet] of requiredSnippets) {

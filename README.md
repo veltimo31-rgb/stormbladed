@@ -26,6 +26,10 @@ Multiplayer requires internet access because PeerJS is loaded from a CDN and pee
 
 Chopping and fishing take time: keep holding the action key/button while the progress bar fills. Move closer if the game shows the proximity hint.
 
+## Resetting your progress
+
+While playing, open chat, type `hardreset`, and press Enter to reset the local game save. This clears your saved character, platinum, rebirths, inventory, upgrades, and cosmetics, then reloads the game from the beginning. The command is handled locally and is not sent to other players. **This reset cannot be undone**; it does not delete your configured quick-link setting.
+
 ## Optional Pygame version
 
 `main.py` is a separate, simpler Pygame prototype, not the implementation of the browser game.
